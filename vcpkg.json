@@ -1,0 +1,13 @@
+{
+  "name": "mini-coding-agent",
+  "version": "0.1.0",
+  "dependencies": [
+    "fmt",
+    "spdlog",
+    "nlohmann-json",
+    "boost-system",
+    "boost-thread",
+    "gtest"
+  ],
+  "builtin-baseline": "latest"
+}
