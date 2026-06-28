@@ -24,13 +24,13 @@ include_directories(${CMAKE_SOURCE_DIR}/src)
 # Core library sources
 set(CORE_SOURCES
     src/kernel/Kernel.cpp
-    src/scheduler/Scheduler.cpp
-    src/planner/Planner.cpp
-    src/memory/MemoryManager.cpp
+    src/scheduler/scheduler.cpp
+    src/planner/planner.cpp
+    src/memory/memory.cpp
     src/context/ContextEngine.cpp
     src/retrieval/RetrievalEngine.cpp
     src/prompt/PromptCompiler.cpp
-    src/agents/AgentManager.cpp
+    src/agents/agents.cpp
     src/tools/ToolRegistry.cpp
     src/execution/ExecutionEngine.cpp
     src/sandbox/SandboxManager.cpp
