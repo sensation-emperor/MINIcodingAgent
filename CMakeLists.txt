@@ -28,37 +28,11 @@ set(CORE_SOURCES
     src/planner/planner.cpp
     src/memory/memory.cpp
     src/context/ContextEngine.cpp
-    src/retrieval/RetrievalEngine.cpp
-    src/prompt/PromptCompiler.cpp
-    src/agents/agents.cpp
     src/tools/ToolRegistry.cpp
-    src/execution/ExecutionEngine.cpp
-    src/sandbox/SandboxManager.cpp
-    src/verification/VerificationEngine.cpp
-    src/reflection/ReflectionEngine.cpp
-    src/repository/RepositoryIndex.cpp
-    src/parser/ParserManager.cpp
-    src/lsp/LSPClient.cpp
-    src/git/GitManager.cpp
-    src/filesystem/FileSystemWatcher.cpp
-    src/terminal/TerminalExecutor.cpp
+    src/agents/agents.cpp
     src/events/EventBus.cpp
     src/logging/Logger.cpp
-    src/metrics/MetricsCollector.cpp
-    src/settings/SettingsManager.cpp
     src/providers/ModelProvider.cpp
-    src/providers/AnthropicProvider.cpp
-    src/providers/OpenAIProvider.cpp
-    src/providers/OllamaProvider.cpp
-    src/models/Message.cpp
-    src/embeddings/EmbeddingEngine.cpp
-    src/vector/VectorDatabase.cpp
-    src/database/SQLiteDB.cpp
-    src/cache/CacheManager.cpp
-    src/taskgraph/TaskGraph.cpp
-    src/workflow/WorkflowEngine.cpp
-    src/knowledge/KnowledgeGraph.cpp
-    src/network/HTTPClient.cpp
     src/config/ConfigManager.cpp
 )
 
