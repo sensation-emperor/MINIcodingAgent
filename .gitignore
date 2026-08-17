@@ -1,5 +1,7 @@
 ```
-# Compiled and build artifacts
+# Build artifacts
+build/
+dist/
 *.o
 *.obj
 *.a
