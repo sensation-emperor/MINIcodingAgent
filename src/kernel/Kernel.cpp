@@ -1,11 +1,11 @@
 #include "kernel/Kernel.h"
 #include "config/ConfigManager.h"
 #include "events/EventBus.h"
-#include "memory/MemoryManager.h"
+#include "memory/memory.h"
 #include "context/ContextEngine.h"
-#include "planner/Planner.h"
-#include "scheduler/Scheduler.h"
-#include "agents/AgentManager.h"
+#include "planner/planner.h"
+#include "scheduler/scheduler.h"
+#include "agents/agents.h"
 #include "logging/Logger.h"
 
 #include <iostream>
@@ -161,7 +161,7 @@ bool Kernel::initializeScheduler() {
 }
 
 bool Kernel::initializeAgents() {
-    agents_ = std::make_shared<AgentManager>();
+    agents_ = std::shared_ptr<AgentManager>(&AgentManager::instance(), [](AgentManager*){});
     return agents_->initialize();
 }
 
@@ -187,7 +187,7 @@ void Kernel::setState(KernelState newState) {
     state_ = newState;
     // Publish state change event
     if (eventBus_) {
-        eventBus_->publish("kernel.state_changed", static_cast<int>(newState));
+        eventBus_->publish("kernel.state_changed", std::to_string(static_cast<int>(newState)));
     }
 }
 

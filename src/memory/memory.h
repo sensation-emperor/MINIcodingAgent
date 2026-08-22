@@ -1,5 +1,5 @@
 // AIOS - MINI Coding Agent Operating System
-// Memory Manager - Manages short-term, long-term, and session memory
+// Memory Manager - Manages short-term, long-term, vector, and knowledge graph memory
 
 #pragma once
 
@@ -11,6 +11,9 @@
 #include <chrono>
 #include <optional>
 #include <functional>
+#include "database/DatabaseEngine.h"
+#include "vector/VectorStore.h"
+#include "knowledge/KnowledgeGraph.h"
 
 namespace aios {
 
@@ -21,35 +24,33 @@ struct MemoryEntry {
     std::string category;  // "conversation", "session", "repository", "long_term"
     std::chrono::system_clock::time_point created_at;
     std::chrono::system_clock::time_point accessed_at;
-    size_t access_count;
-    size_t size_bytes;
+    size_t access_count = 0;
+    size_t size_bytes = 0;
     std::vector<std::string> tags;
     std::string checksum;
 };
 
 struct MemoryStats {
-    size_t total_entries;
-    size_t total_size_bytes;
-    size_t conversation_memory_entries;
-    size_t session_memory_entries;
-    size_t repository_memory_entries;
-    size_t long_term_memory_entries;
-    size_t cache_hits;
-    size_t cache_misses;
+    size_t total_entries = 0;
+    size_t total_size_bytes = 0;
+    size_t conversation_memory_entries = 0;
+    size_t session_memory_entries = 0;
+    size_t repository_memory_entries = 0;
+    size_t long_term_memory_entries = 0;
+    size_t cache_hits = 0;
+    size_t cache_misses = 0;
 };
 
 class MemoryManager {
 public:
+    static MemoryManager& instance();
+
     MemoryManager();
     ~MemoryManager();
     
     // Initialize memory subsystem
     bool initialize();
-    
-    // Shutdown and cleanup
     void shutdown();
-    
-    // Stop operations gracefully
     void stop();
     
     // Store a memory entry
@@ -57,75 +58,73 @@ public:
                const std::string& category = "session",
                const std::vector<std::string>& tags = {});
     
+    // Semantic Vector Storage & Retrieval
+    bool storeSemantic(const std::string& key, const std::string& value,
+                       const std::string& category = "long_term",
+                       const std::vector<std::string>& tags = {});
+
+    std::vector<VectorSearchResult> searchSemantic(const std::string& query, 
+                                                  size_t top_k = 5, 
+                                                  float min_similarity = 0.0f) const;
+
+    // Knowledge Graph Integration
+    bool addKnowledgeNode(const KnowledgeNode& node);
+    bool addKnowledgeEdge(const std::string& from_id, const std::string& to_id, 
+                         RelationType relation, float weight = 1.0f,
+                         const std::string& description = "");
+    std::vector<KnowledgeNode> queryRelatedKnowledge(const std::string& start_node_id, size_t max_depth = 2) const;
+    std::vector<KnowledgeNode> findBugFix(const std::string& error_text) const;
+
     // Retrieve a memory entry
     std::optional<std::string> retrieve(const std::string& key);
-    
-    // Retrieve with category filter
     std::optional<std::string> retrieve(const std::string& key, const std::string& category);
     
     // Delete a memory entry
     bool remove(const std::string& key);
-    
-    // Delete all entries in a category
     bool clearCategory(const std::string& category);
     
-    // Search memories by pattern
+    // Search memories by pattern or tags
     std::vector<MemoryEntry> search(const std::string& pattern, 
                                     const std::string& category = "",
                                     size_t max_results = 100);
     
-    // Search by tags
     std::vector<MemoryEntry> searchByTags(const std::vector<std::string>& tags,
                                           size_t max_results = 100);
     
-    // Get memory statistics
+    // Statistics & Limits
     MemoryStats getStats() const;
-    
-    // Set memory limit (in bytes)
     void setMemoryLimit(size_t limit_bytes);
-    
-    // Get current memory usage
     size_t getMemoryUsage() const;
-    
-    // Compact memory (remove old/unused entries)
     void compact();
     
-    // Export memory to JSON string
+    // Serialization & Persistence
     std::string exportToJson() const;
-    
-    // Import memory from JSON string
     bool importFromJson(const std::string& json_data);
-    
-    // Get recent entries
     std::vector<MemoryEntry> getRecent(size_t count = 10) const;
-    
-    // Get frequently accessed entries
     std::vector<MemoryEntry> getFrequentlyAccessed(size_t count = 10) const;
     
-    // Update access time for a key
     void touch(const std::string& key);
-    
-    // Check if key exists
     bool contains(const std::string& key) const;
-    
-    // Get all keys in category
     std::vector<std::string> getKeys(const std::string& category = "") const;
     
-    // Set persistence path for long-term memory
     void setPersistencePath(const std::string& path);
-    
-    // Save to persistent storage
     bool persist();
-    
-    // Load from persistent storage
     bool load();
+
+    // Access to Subsystems
+    std::shared_ptr<VectorStore> getVectorStore() const { return vector_store_; }
+    std::shared_ptr<KnowledgeGraph> getKnowledgeGraph() const { return knowledge_graph_; }
+    std::shared_ptr<DatabaseEngine> getDatabaseEngine() const { return database_engine_; }
 
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
     mutable std::mutex mutex_;
     
-    // Internal methods
+    std::shared_ptr<VectorStore> vector_store_;
+    std::shared_ptr<KnowledgeGraph> knowledge_graph_;
+    std::shared_ptr<DatabaseEngine> database_engine_;
+
     void evictIfNeeded();
     std::string generateId() const;
     std::string computeChecksum(const std::string& data) const;

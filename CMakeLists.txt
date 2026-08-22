@@ -18,6 +18,17 @@ find_package(Boost REQUIRED COMPONENTS system thread)
 # Optional: Find CPR for HTTP
 find_package(CPR QUIET)
 
+# Optional: Find Qt6/Qt5 for GUI
+if(BUILD_GUI)
+    find_package(Qt6 COMPONENTS Core Gui Widgets QUIET)
+    if(NOT Qt6_FOUND)
+        find_package(Qt5 COMPONENTS Core Gui Widgets REQUIRED)
+    endif()
+    set(CMAKE_AUTOMOC ON)
+    set(CMAKE_AUTORCC ON)
+    set(CMAKE_AUTOUIC ON)
+endif()
+
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/src)
 
@@ -26,15 +37,42 @@ set(CORE_SOURCES
     src/kernel/Kernel.cpp
     src/scheduler/scheduler.cpp
     src/planner/planner.cpp
+    src/taskgraph/TaskGraph.cpp
+    src/parser/ASTParser.cpp
+    src/repository/RepositoryIndex.cpp
+    src/database/DatabaseEngine.cpp
+    src/vector/VectorStore.cpp
+    src/knowledge/KnowledgeGraph.cpp
     src/memory/memory.cpp
     src/context/ContextEngine.cpp
     src/tools/ToolRegistry.cpp
     src/agents/agents.cpp
+    src/agents/SpecializedAgents.cpp
+    src/agents/Orchestrator.cpp
+    src/agents/AgentToolParser.cpp
     src/events/EventBus.cpp
     src/logging/Logger.cpp
     src/providers/ModelProvider.cpp
+    src/providers/ModelRouter.cpp
+    src/network/HttpClient.cpp
+    src/gui/Theme.cpp
     src/config/ConfigManager.cpp
+    src/cli/ReplClient.cpp
+    src/workspace/WorkspaceManager.cpp
+    src/testing/TestGenerator.cpp
 )
+
+if(BUILD_GUI)
+    list(APPEND CORE_SOURCES
+        src/gui/FloatingIslandNavBar.cpp
+        src/gui/CommandPillWidget.cpp
+        src/gui/ChatView.cpp
+        src/gui/DiffViewer.cpp
+        src/gui/TaskGraphView.cpp
+        src/gui/TerminalWidget.cpp
+        src/gui/MainWindow.cpp
+    )
+endif()
 
 # Create core library
 add_library(aios_core STATIC ${CORE_SOURCES})
@@ -47,9 +85,22 @@ target_link_libraries(aios_core PUBLIC
     Boost::thread
 )
 
+if(WIN32)
+    target_link_libraries(aios_core PUBLIC ws2_32)
+endif()
+
 if(CPR_FOUND)
     target_link_libraries(aios_core PUBLIC cpr::cpr)
     target_compile_definitions(aios_core PRIVATE HAS_CPR)
+endif()
+
+if(BUILD_GUI)
+    if(Qt6_FOUND)
+        target_link_libraries(aios_core PUBLIC Qt6::Core Qt6::Gui Qt6::Widgets)
+    else()
+        target_link_libraries(aios_core PUBLIC Qt5::Core Qt5::Gui Qt5::Widgets)
+    endif()
+    target_compile_definitions(aios_core PUBLIC BUILD_GUI)
 endif()
 
 # Main executable
@@ -62,8 +113,18 @@ if(BUILD_TESTS)
     find_package(GTest QUIET)
     
     if(GTest_FOUND)
-        add_executable(aios_tests tests/test_main.cpp)
-        target_link_libraries(aios_tests PRIVATE aios_core GTest::gtest_main)
+        add_executable(aios_tests 
+            tests/test_main.cpp 
+            tests/test_agents.cpp 
+            tests/test_providers.cpp
+            tests/test_taskgraph.cpp
+            tests/test_gui.cpp
+            tests/test_repository.cpp
+            tests/test_memory.cpp
+            tests/benchmark_aios.cpp
+            tests/test_developer_suite.cpp
+        )
+        target_link_libraries(aios_tests PRIVATE aios_core GTest::gtest_main GTest::gtest)
         add_test(NAME AIOS_Tests COMMAND aios_tests)
     endif()
 endif()

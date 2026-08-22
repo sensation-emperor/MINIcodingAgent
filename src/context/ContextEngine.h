@@ -13,6 +13,7 @@
 #include <chrono>
 #include <set>
 #include <map>
+#include <functional>
 
 namespace aios {
 
@@ -66,6 +67,8 @@ struct ConversationState {
     std::vector<std::string> failed_attempts;
     std::string current_objective;
     double confidence_estimate;
+    std::chrono::system_clock::time_point created_at;
+    std::chrono::system_clock::time_point accessed_at;
     std::chrono::milliseconds time_spent;
     std::chrono::milliseconds remaining_budget;
     std::vector<std::pair<std::string, std::string>> active_tool_outputs;

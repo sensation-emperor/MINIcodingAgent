@@ -2,6 +2,8 @@
 // Tool Registry Implementation
 
 #include "ToolRegistry.h"
+#include "workspace/WorkspaceTools.h"
+#include "testing/TestingTools.h"
 #include "filesystem/filesystem.h"
 #include "terminal/terminal.h"
 #include "git/git.h"
@@ -824,70 +826,7 @@ ToolResult CodeAnalysisTools::analyzeComplexity(const std::unordered_map<std::st
     return result;
 }
 
-// ===== TestingTools Implementation =====
 
-TestingTools::TestingTools(std::shared_ptr<TerminalExecutor> executor, std::shared_ptr<FileSystem> fs)
-    : executor_(executor), fs_(fs) {}
-
-ToolDefinition TestingTools::getDefinition() const {
-    ToolDefinition def;
-    def.name = "test";
-    def.description = "Run tests and get coverage";
-    def.category = ToolCategory::Testing;
-    def.required_permissions = {ToolPermission::Execute, ToolPermission::Read};
-    return def;
-}
-
-ToolResult TestingTools::execute(const std::unordered_map<std::string, std::string>& params) {
-    auto start = std::chrono::steady_clock::now();
-    
-    auto op_it = params.find("operation");
-    if (op_it == params.end()) {
-        return ToolResult::error("Missing 'operation' parameter");
-    }
-    
-    ToolResult result;
-    const std::string& op = op_it->second;
-    
-    if (op == "run") {
-        result = runTests(params);
-    } else if (op == "file") {
-        result = runTestFile(params);
-    } else if (op == "coverage") {
-        result = getTestCoverage(params);
-    } else {
-        result = ToolResult::error("Unknown test operation: " + op);
-    }
-    
-    auto end = std::chrono::steady_clock::now();
-    result.execution_time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    recordCall(result.success, result.execution_time);
-    
-    return result;
-}
-
-ToolResult TestingTools::runTests(const std::unordered_map<std::string, std::string>& params) {
-    ToolResult result;
-    result.success = true;
-    result.output = "Running all tests...\n[==========] Running 10 tests\n[==========] 10 tests passed.";
-    return result;
-}
-
-ToolResult TestingTools::runTestFile(const std::unordered_map<std::string, std::string>& params) {
-    auto file_it = params.find("file");
-    
-    ToolResult result;
-    result.success = true;
-    result.output = "Running tests in " + (file_it != params.end() ? file_it->second : "test file") + "\n[PASSED] 5 tests";
-    return result;
-}
-
-ToolResult TestingTools::getTestCoverage(const std::unordered_map<std::string, std::string>& params) {
-    ToolResult result;
-    result.success = true;
-    result.output = "Test Coverage:\n- Lines: 85%\n- Functions: 90%\n- Branches: 75%";
-    return result;
-}
 
 // ===== BuildTools Implementation =====
 
@@ -1128,20 +1067,18 @@ ToolRegistry& ToolRegistry::instance() {
 bool ToolRegistry::initialize() {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    Logger logger{"ToolRegistry"};
-    logger.info("Initializing Tool Registry");
+    LOG_INFO("Initializing Tool Registry");
     
     createDefaultTools();
     
-    logger.info("Tool Registry initialized with {} tools", tools_.size());
+    LOG_INFO("Tool Registry initialized with {} tools", tools_.size());
     return true;
 }
 
 void ToolRegistry::shutdown() {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    Logger logger{"ToolRegistry"};
-    logger.info("Shutting down Tool Registry");
+    LOG_INFO("Shutting down Tool Registry");
     
     tools_.clear();
 }
@@ -1309,39 +1246,42 @@ void ToolRegistry::setContextEngine(std::shared_ptr<ContextEngine> context) {
 void ToolRegistry::createDefaultTools() {
     // Create tools with available dependencies
     if (fs_) {
-        registerTool("filesystem", std::make_shared<FilesystemTools>(fs_));
-        registerTool("search", std::make_shared<SearchTools>(fs_));
+        tools_["filesystem"] = std::make_shared<FilesystemTools>(fs_);
+        tools_["search"] = std::make_shared<SearchTools>(fs_);
     }
     
     if (terminal_) {
-        registerTool("terminal", std::make_shared<TerminalTools>(terminal_));
-        registerTool("testing", std::make_shared<TestingTools>(terminal_, fs_));
-        registerTool("build", std::make_shared<BuildTools>(terminal_));
+        tools_["terminal"] = std::make_shared<TerminalTools>(terminal_);
+        tools_["build"] = std::make_shared<BuildTools>(terminal_);
     }
     
     if (git_) {
-        registerTool("git", std::make_shared<GitTools>(git_));
+        tools_["git"] = std::make_shared<GitTools>(git_);
     }
     
     if (lsp_) {
-        registerTool("lsp", std::make_shared<LSPTools>(lsp_));
+        tools_["lsp"] = std::make_shared<LSPTools>(lsp_);
     }
     
     if (parser_) {
-        registerTool("code_analysis", std::make_shared<CodeAnalysisTools>(parser_));
+        tools_["code_analysis"] = std::make_shared<CodeAnalysisTools>(parser_);
     }
     
     if (http_) {
-        registerTool("network", std::make_shared<NetworkTools>(http_));
+        tools_["network"] = std::make_shared<NetworkTools>(http_);
     }
     
     if (memory_) {
-        registerTool("memory", std::make_shared<MemoryTools>(memory_));
+        tools_["memory"] = std::make_shared<MemoryTools>(memory_);
     }
     
     if (context_) {
-        registerTool("context", std::make_shared<ContextTools>(context_));
+        tools_["context"] = std::make_shared<ContextTools>(context_);
     }
+
+    // Register modern WorkspaceTools and TestingTools
+    tools_["workspace"] = std::make_shared<workspace::WorkspaceTools>();
+    tools_["testing"] = std::make_shared<testing::TestingTools>();
 }
 
 } // namespace aios

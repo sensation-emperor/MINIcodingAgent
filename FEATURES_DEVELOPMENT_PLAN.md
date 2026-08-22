@@ -1,336 +1,129 @@
 # AIOS Feature Development Plan & Progress
 
 ## Overview
-This document outlines the new features planned and implemented for the MINIcodingAgent (AIOS) application.
+This document outlines the features planned and implemented for the MINIcodingAgent (AIOS) application.
 
 ---
 
 ## ✅ COMPLETED FEATURES
 
 ### 1. Context Engine (`src/context/ContextEngine.h`, `src/context/ContextEngine.cpp`)
-
-**Purpose:** Advanced context management for LLM interactions with intelligent file ranking and conversation state tracking.
-
-**Key Features Implemented:**
-- **Conversation Management**
-  - Start/end conversations with unique IDs
-  - Track conversation state including goals, objectives, TODO lists
-  - Store and retrieve conversation history
-  - Manage user preferences per conversation
-
-- **Context Item Management**
-  - Multiple context types: Conversation, File, Symbol, Dependency, GitHistory, TerminalOutput, Error, Documentation, UserPreference
-  - Automatic relevance scoring based on type and usage
-  - Pin/unpin important context items
-  - Token counting and budget management
-  - Automatic eviction of low-relevance items when over token budget
-
-- **File Ranking System**
-  - Rank files by relevance to queries
-  - Track recently modified files
-  - Build dependency chains between files
-  - Score files based on importance, recency, and relationships
-
-- **Symbol Context**
-  - Cache symbol definitions and usages
-  - Track caller/callee relationships
-  - Find symbols across files
-
-- **Context Building**
-  - Build optimized prompts from context
-  - Select relevant context items based on task
-  - Truncate content to fit token limits
-  - Event subscription for context changes
-
-**Data Structures:**
-```cpp
-struct ContextItem { id, type, content, source, relevance_score, tokens, tags, metadata, pinned }
-struct ConversationState { goal, tasks, todo_list, important_files, recent_edits, confidence }
-struct FileRanking { file_path, score, reasons, edit_distance, reference_count }
-struct SymbolContext { name, type, file_path, definition, usages, callers, callees }
-```
+- Intelligent file ranking, dependency chains, and symbol caching.
+- Token budget management and LRU eviction.
+- Conversation state tracking.
 
 ---
 
 ### 2. Tool Registry (`src/tools/ToolRegistry.h`, `src/tools/ToolRegistry.cpp`)
-
-**Purpose:** Comprehensive tool system enabling agents to interact with filesystem, terminal, git, LSP, and more.
-
-**Key Features Implemented:**
-
-#### Tool Categories (14 categories):
-1. **Filesystem Tools** - read, write, delete, list, mkdir, exists, size, copy, move, search
-2. **Terminal Tools** - run commands, execute scripts
-3. **Git Tools** - status, diff, commit, push, pull, checkout, branch, merge, log, stash
-4. **Search Tools** - grep, regex search, find files, find symbols
-5. **LSP Tools** - go to definition, find references, hover, completion, diagnostics, rename, format
-6. **Network Tools** - HTTP GET/POST, download files
-7. **Code Analysis Tools** - parse files, get AST, symbols, call graph, dependencies, complexity analysis
-8. **Testing Tools** - run tests, run test files, get coverage
-9. **Build Tools** - compile, clean, install dependencies
-10. **Memory Tools** - store, retrieve, search, delete memories
-11. **Context Tools** - add/get/remove context, rank files
-
-#### Tool System Features:
-- **Tool Definition System**
-  - Name, description, category
-  - Required permissions (Read, Write, Execute, Network, Dangerous)
-  - Parameter validation with required/optional flags
-  - Default parameter values
-  - Usage examples
-  - Timeout configuration
-
-- **Permission System**
-  - Check permissions before tool execution
-  - Mark dangerous tools requiring explicit approval
-  - Support for permission grants per session
-
-- **Statistics Tracking**
-  - Total/successful/failed calls per tool
-  - Execution time statistics (avg, min, max)
-  - Registry-wide statistics
-
-- **Tool Registry**
-  - Singleton pattern for global access
-  - Register/unregister tools dynamically
-  - List tools by name or category
-  - Execute tools with parameter validation
-  - Dependency injection for tool creation
-
-**Architecture:**
-```cpp
-class Tool { virtual execute(), getDefinition(), validateParams() }
-class FilesystemTools : public Tool { ... }
-class TerminalTools : public Tool { ... }
-class GitTools : public Tool { ... }
-// ... etc for each category
-
-class ToolRegistry {
-    registerTool(name, tool)
-    executeTool(name, params)
-    executeWithPermission(name, params, granted_permissions)
-    listTools(), listToolsByCategory(category)
-}
-```
+- 14 tool categories (Filesystem, Terminal, Git, Search, LSP, Network, Testing, Build, etc.).
+- Permission enforcement (Read, Write, Execute, Network, Dangerous).
+- Execution statistics and singleton registry.
 
 ---
 
-## 📋 PLANNED FUTURE FEATURES
-
-### 3. Enhanced Agent System (Extension)
-- **Specialized Agent Types**
-  - Planner Agent - Break down complex tasks
-  - Researcher Agent - Search documentation and codebase
-  - Coder Agent - Write and modify code
-  - Tester Agent - Run and analyze tests
-  - Reviewer Agent - Code review and security audit
-  - Debugger Agent - Find and fix bugs
-  
-- **Multi-Agent Orchestration**
-  - Agent collaboration protocols
-  - Task distribution among agents
-  - Result aggregation from multiple agents
-  - Conflict resolution
-
-### 4. Advanced Planning System
-- **Task Graph Execution**
-  - Dependency-aware task scheduling
-  - Parallel execution of independent tasks
-  - Rollback on failure
-  - Checkpoint creation and restoration
-
-- **Plan Strategies**
-  - Chain-of-thought planning
-  - Tree-of-thought exploration
-  - Reflection-based plan refinement
-  - Self-critique and correction
-
-### 5. Repository Intelligence
-- **Incremental Indexing**
-  - Watch filesystem for changes
-  - Update index incrementally
-  - Cache invalidation strategies
-
-- **AST-Based Analysis**
-  - Parse multiple languages with Tree-sitter
-  - Build symbol tables
-  - Generate call graphs
-  - Track imports/exports
-
-- **Semantic Search**
-  - Combine BM25 + embeddings
-  - AST-aware search
-  - Git history integration
-  - Dependency graph traversal
-
-### 6. Memory Enhancements
-- **Long-term Memory**
-  - Persistent storage with SQLite
-  - Vector embeddings for semantic retrieval
-  - Summarization of old conversations
-  - Knowledge graph construction
-
-- **Working Memory**
-  - Short-term context buffer
-  - Priority-based eviction
-  - Compression techniques
-
-### 7. Security & Permissions
-- **Sandboxed Execution**
-  - Docker/Firecracker integration
-  - Linux namespaces isolation
-  - Resource limits enforcement
-
-- **Permission Layers**
-  - Policy-based access control
-  - Human approval checkpoints
-  - Audit logging
-
-### 8. Model Routing
-- **Intelligent Model Selection**
-  - Route simple tasks to small models
-  - Use large models for complex reasoning
-  - Specialized models for code generation
-  - Embedding models for retrieval
-
-- **Cost Optimization**
-  - Track token usage and costs
-  - Budget enforcement
-  - Model fallback strategies
-
-### 9. GUI Integration (Qt 6)
-- **Main Window**
-  - Conversation view
-  - File explorer
-  - Task progress visualization
-  - Settings panel
-
-- **Components**
-  - Chat interface with markdown support
-  - Diff viewer for code changes
-  - Terminal emulator
-  - Agent status dashboard
-
-### 10. Testing Framework
-- **Unit Tests**
-  - GoogleTest integration
-  - Mock providers for testing
-  - Coverage reporting
-
-- **Integration Tests**
-  - End-to-end agent workflows
-  - Tool execution tests
-  - Performance benchmarks
+### 3. Enhanced Multi-Agent System & Orchestration (`src/agents/`)
+- **Resilient Tool Parsing (`AgentToolParser`)**:
+  - Extracts tool calls from Markdown JSON blocks, XML `<tool_call>` tags, ReAct action syntax, and raw JSON envelopes.
+  - Formats schemas and tool observations for small local LLMs.
+- **Specialized Concrete Agents (`SpecializedAgents`)**:
+  - `PlannerAgent`: Decomposes tasks into dependency-ordered `AgentPlanStep` graphs.
+  - `ResearcherAgent`: Read-only codebase explorer with `filesystem`, `search`, and `context` tools.
+  - `CoderAgent`: Code modifications and surgical patch creation.
+  - `TesterAgent`: Automated build and test runner with diagnostic extraction.
+  - `ReviewerAgent`: Quality scoring (0–100), security auditing, and edge-case evaluation.
+  - `DebuggerAgent`: Automated root-cause diagnostics and surgical patch generation.
+- **Hierarchical Orchestrator (`Orchestrator`)**:
+  - Pipeline: `Plan -> Research -> Git Snapshot -> Code -> Test -> (Debug/Repair Loop) -> Review`.
+  - Dual observability: Real-time `EventBus` publishing (`orchestrator.step_progress`) + direct async callbacks.
+  - Automatic Git checkpointing and rollback support.
 
 ---
 
-## 🏗️ ARCHITECTURE IMPROVEMENTS
-
-### Current State
-```
-┌─────────────────────────────────────────┐
-│              Kernel                      │
-├─────────────────────────────────────────┤
-│  Scheduler  │  Planner  │  AgentManager │
-├─────────────────────────────────────────┤
-│     Context Engine  │   Tool Registry   │
-├─────────────────────────────────────────┤
-│     Memory Manager  │   EventBus        │
-└─────────────────────────────────────────┘
-```
-
-### Target Architecture
-```
-┌──────────────────────────────────────────────┐
-│                  UI Layer                     │
-│         (Qt GUI / CLI / Web Interface)        │
-├──────────────────────────────────────────────┤
-│               API Gateway                     │
-├──────────────────────────────────────────────┤
-│                 Kernel                        │
-│  ┌─────────────────────────────────────────┐  │
-│  │            Event Bus                     │  │
-│  └─────────────────────────────────────────┘  │
-├──────────┬──────────┬──────────┬─────────────┤
-│ Scheduler│ Planner  │  Agents  │  Tools      │
-├──────────┼──────────┼──────────┼─────────────┤
-│  Memory  │ Context  │Repository│  Sandbox    │
-│ Manager  │ Engine   │  Index   │  Manager    │
-├──────────┴──────────┴──────────┴─────────────┤
-│           Model Provider Abstraction          │
-│  (OpenAI, Anthropic, Ollama, Local, etc.)    │
-└──────────────────────────────────────────────┘
-```
+### 4. Model Routing & Live AI Providers (`src/providers/`, `src/network/`)
+- **Universal HTTP Transport & SSE Streaming (`HttpClient`)**:
+  - Cross-platform HTTP/1.1 client with Server-Sent Events (SSE) token delta streaming.
+  - Robust zero-allocation SSE line & buffer fragmentation parser.
+- **Multi-Provider Suite (`ModelProvider`)**:
+  - `LMStudioProvider`: Local OpenAI-compatible endpoint (`localhost:1234/v1`), model discovery, and SSE streaming.
+  - `OllamaProvider`: Local Ollama REST API (`localhost:11434`), tag discovery, and ndjson/SSE streaming.
+  - `OpenAIProvider`: Official OpenAI API (`api.openai.com/v1`) with Bearer auth and SSE streaming.
+  - `AnthropicProvider`: Claude Messages API (`api.anthropic.com/v1`) with `x-api-key` and content block delta streaming.
+  - `OpenRouterProvider`: Multi-model aggregator endpoint with custom app headers.
+- **Intelligent Model Router (`ModelRouter`)**:
+  - Role-based routing table mapping `AgentType` to model tiers.
+  - Automatic fallback chain: `LM Studio -> Ollama -> OpenRouter -> OpenAI -> Anthropic`.
+  - Circuit breaker health management (`Healthy`, `Degraded`, `Offline`) with recovery probing.
+  - Embedded Metrics Ledger tracking prompt tokens, completion tokens, latency (ms), and throughput (tokens/sec).
 
 ---
 
-## 📊 METRICS & MONITORING
-
-### Implemented Metrics
-- Tool execution statistics
-- Context token usage
-- Cache hit/miss rates
-- Conversation state tracking
-
-### Planned Metrics
-- Agent performance metrics
-- Task completion rates
-- Cost tracking per task/agent
-- Latency measurements
-- Error rates and patterns
-- Resource utilization (CPU, memory, GPU)
+### 5. Advanced Planning & Task Graph DAG Execution Engine (`src/taskgraph/`, `src/planner/`)
+- **Task Graph DAG Engine (`TaskGraph`)**:
+  - Directed Acyclic Graph (DAG) task container with cycle detection, topological levels calculation, and JSON serialization.
+  - Node states: `Pending`, `Ready`, `Running`, `Completed`, `Failed`, `Skipped`, `RolledBack`.
+- **High-Performance Concurrent Executor (`TaskGraphExecutor`)**:
+  - $O(1)$ atomic in-degree dependency resolution on task completion.
+  - Fine-grained locking eliminating global mutex serialization.
+  - Targeted condition variable signaling (`notify_one`) preventing thundering-herd on worker threads.
+  - Dynamic dependency resolution, retry handling, and cascading downstream invalidation (`Skipped`).
+- **Multi-Strategy Reasoning (`Planner`)**:
+  - `Chain-of-Thought (CoT)`: Fast linear DAG task decomposition.
+  - `Tree-of-Thought (ToT)`: Generates multiple candidate plan branch DAGs, computes heuristic viability scores, and selects optimal branch.
+  - `Reflection & Self-Critique`: Drafts initial plan, analyzes gaps/prerequisites, and outputs refined execution graph.
 
 ---
 
-## 🔧 INTEGRATION POINTS
-
-### External Services
-- **LLM Providers**: OpenAI, Anthropic, Google, Ollama, LM Studio, vLLM
-- **Vector Databases**: SQLite-vec, Qdrant, Milvus, Weaviate
-- **Container Runtimes**: Docker, Firecracker, WSL
-- **Language Servers**: Any LSP-compatible server
-
-### File Formats
-- JSON for configuration and data exchange
-- SQLite for persistent storage
-- Markdown for documentation and responses
-
----
-
-## 🚀 NEXT STEPS
-
-1. **Complete Stub Implementations**
-   - Fill in FileSystem, TerminalExecutor, GitManager stubs
-   - Implement actual LSP client
-   - Add HTTP client with CPR/libcurl
-
-2. **Add Provider Implementations**
-   - OpenAI provider
-   - Anthropic provider
-   - Ollama provider for local models
-
-3. **Build Event System**
-   - Complete EventBus implementation
-   - Add event handlers for all subsystems
-
-4. **Create Test Suite**
-   - Unit tests for ContextEngine
-   - Unit tests for ToolRegistry
-   - Integration tests
-
-5. **Documentation**
-   - API documentation
-   - User guide
-   - Contribution guidelines
+### 6. Desktop GUI with Mobile Skeuomorphism-Glassmorphism System (`src/gui/`)
+- **Theme & Design System (`Theme`)**:
+  - Coral Rose (`#FF6B9D`) to Sunset Orange (`#FF9A56`) brand gradient.
+  - Tactile depth with a single virtual light source from top-left.
+  - Floating Island Navigation Bars with capsule shape (`border-radius >= 24px`, margins `12-16px`).
+  - Floating Pill & Circular Buttons (`border-radius >= 20px`).
+  - Container cards with deep rounded corners (`border-radius >= 14px`).
+- **Custom Glassmorphic Widgets**:
+  - `FloatingIslandNavBar`: Floating capsule top bar with zero-overlap touch targets.
+  - `CommandPillWidget`: Bottom command capsule with Mode Toggle (Orchestrator / Single Agent / DAG Planner), Model Selector, and circular CTA button.
+  - `ChatView`: Translucent conversational surface with agent avatar pills, thought disclosure boxes, and live token streaming.
+  - `DiffViewer`: Syntax-highlighted code diff inspector inside container cards.
+  - `TaskGraphView`: Live interactive DAG progress visualizer.
+  - `TerminalWidget`: Translucent terminal console for build and shell outputs.
+  - `MainWindow`: Orchestrates viewports and connects to backend asynchronously.
 
 ---
 
-## 📝 SUMMARY
+### 7. Repository Intelligence & AST Parser (`src/parser/`, `src/repository/`)
+- **Multi-Language AST Engine (`ASTParser`)**:
+  - Structural symbol extraction for C++, Python, JavaScript/TypeScript, Rust, Go, and Java.
+  - Extracts classes, functions, methods, structs, interfaces, imports, line numbers, and preceding docstrings.
+  - Callee extraction and call graph relationship tracking.
+- **Incremental Repository Index (`RepositoryIndex`)**:
+  - Checksum-based incremental indexing (skipping unchanged files, re-parsing only modified files).
+  - Exact and fuzzy symbol table lookups (`findSymbol`, `findCallers`, `findReferences`).
+  - **Hybrid Search Engine**: Combines BM25 lexical token frequency ranking and symbol table matches using **Reciprocal Rank Fusion (RRF)**.
 
-This development cycle added two major components to AIOS:
+---
 
-1. **Context Engine** - A sophisticated context management system that handles conversation state, file ranking, symbol tracking, and prompt building with token budget awareness.
+### 8. Persistent Long-Term Memory & SQLite Knowledge Engine (`src/database/`, `src/vector/`, `src/knowledge/`, `src/memory/`)
+- **Persistent Storage Engine (`DatabaseEngine`)**:
+  - Atomic, persistent storage for conversations, messages, structured memories, and user preferences.
+  - JSON import/export and disk synchronization.
+- **SIMD Dense Vector Store & Semantic Retrieval (`VectorStore`)**:
+  - Flat contiguous 64-byte aligned vector matrix for SIMD/vectorized dot products.
+  - Zero-allocation `std::string_view` word and 3-gram feature projection.
+  - Bounded $O(N \log K)$ min-heap selection.
+  - Multi-reader `std::shared_mutex` concurrency.
+- **Domain-Specific Software Knowledge Graph (`KnowledgeGraph`)**:
+  - Entity types: `Symbol`, `BugFix`, `ArchitectureDecision`, `UserPreference`, `ProjectTask`.
+  - Relationship types: `Calls`, `Implements`, `Fixes`, `DependsOn`, `Prefers`, `Violates`.
+  - Multi-hop BFS graph traversal, error-to-fix lookup, and user preference extraction for prompt injection.
+- **Unified Memory Manager (`MemoryManager`)**:
+  - Working memory buffer with LRU/LFU eviction and byte-limit compaction.
+  - Unified interface tying together short-term, long-term, vector semantic, and graph memory.
 
-2. **Tool Registry** - A comprehensive tool framework with 11 tool categories covering filesystem operations, terminal execution, git, search, LSP, network, code analysis, testing, building, memory, and context management.
+---
 
-These components form the foundation for building intelligent coding agents that can understand codebases, manage complex tasks, and interact with development tools safely and efficiently.
+### 9. Performance Profiling & Microbenchmark Suite (`tests/benchmark_aios.cpp`)
+- Automated benchmark suite measuring operations/sec and latency percentiles (p50, p95, p99) for:
+  - 100-node wide concurrent DAG execution under `TaskGraphExecutor`.
+  - 1,000+ document semantic search queries under `VectorStore`.
+  - Zero-allocation SSE stream chunk extraction under `HttpClient`.

@@ -50,9 +50,6 @@ struct ContextEngine::Impl {
     
     // Recently modified files
     std::vector<std::pair<std::chrono::system_clock::time_point, std::string>> recent_files;
-    
-    // Logger
-    Logger logger{"ContextEngine"};
 };
 
 ContextEngine::ContextEngine() : impl_(std::make_unique<Impl>()) {}
@@ -66,7 +63,7 @@ bool ContextEngine::initialize() {
         return true;
     }
     
-    impl_->logger.info("Initializing Context Engine");
+    LOG_INFO("Initializing Context Engine");
     
     // Initialize statistics
     impl_->stats = ContextStats{};
@@ -75,7 +72,7 @@ bool ContextEngine::initialize() {
     // In production, this would scan the filesystem
     
     running_ = true;
-    impl_->logger.info("Context Engine initialized successfully");
+    LOG_INFO("Context Engine initialized successfully");
     
     return true;
 }
@@ -83,18 +80,18 @@ bool ContextEngine::initialize() {
 void ContextEngine::shutdown() {
     stopping_ = true;
     
-    impl_->logger.info("Shutting down Context Engine");
+    LOG_INFO("Shutting down Context Engine");
     
     // Persist important context
     // In production, save to database
     
     running_ = false;
-    impl_->logger.info("Context Engine shut down complete");
+    LOG_INFO("Context Engine shut down complete");
 }
 
 void ContextEngine::stop() {
     stopping_ = true;
-    impl_->logger.debug("Context Engine stop requested");
+    LOG_DEBUG("Context Engine stop requested");
 }
 
 std::string ContextEngine::startConversation(const std::string& initial_goal) {
@@ -112,7 +109,7 @@ std::string ContextEngine::startConversation(const std::string& initial_goal) {
     impl_->context_items[conv_id] = {};
     impl_->conversation_tokens[conv_id] = 0;
     
-    impl_->logger.info("Started conversation: {}", conv_id);
+    LOG_INFO("Started conversation: {}", conv_id);
     
     notifyChange(conv_id, "started");
     
@@ -124,7 +121,7 @@ bool ContextEngine::endConversation(const std::string& conversation_id) {
     
     auto it = impl_->conversations.find(conversation_id);
     if (it == impl_->conversations.end()) {
-        impl_->logger.warn("Conversation not found: {}", conversation_id);
+        LOG_WARN("Conversation not found: {}", conversation_id);
         return false;
     }
     
@@ -137,7 +134,7 @@ bool ContextEngine::endConversation(const std::string& conversation_id) {
     impl_->conversations.erase(conversation_id);
     impl_->conversation_tokens.erase(conversation_id);
     
-    impl_->logger.info("Ended conversation: {}", conversation_id);
+    LOG_INFO("Ended conversation: {}", conversation_id);
     
     notifyChange(conversation_id, "ended");
     
@@ -161,7 +158,7 @@ bool ContextEngine::updateConversationState(const std::string& conversation_id,
     
     auto it = impl_->conversations.find(conversation_id);
     if (it == impl_->conversations.end()) {
-        impl_->logger.warn("Conversation not found: {}", conversation_id);
+        LOG_WARN("Conversation not found: {}", conversation_id);
         return false;
     }
     
@@ -180,7 +177,7 @@ bool ContextEngine::addMessage(const std::string& conversation_id,
     
     auto conv_it = impl_->conversations.find(conversation_id);
     if (conv_it == impl_->conversations.end()) {
-        impl_->logger.warn("Conversation not found: {}", conversation_id);
+        LOG_WARN("Conversation not found: {}", conversation_id);
         return false;
     }
     
@@ -786,7 +783,7 @@ void ContextEngine::clearCache() {
     impl_->stats.cache_hits = 0;
     impl_->stats.cache_misses = 0;
     
-    impl_->logger.debug("Context cache cleared");
+    LOG_DEBUG("Context cache cleared");
 }
 
 ContextStats ContextEngine::getStats() const {
@@ -797,7 +794,7 @@ ContextStats ContextEngine::getStats() const {
 void ContextEngine::setTokenBudget(size_t tokens) {
     std::lock_guard<std::mutex> lock(mutex_);
     impl_->token_budget = tokens;
-    impl_->logger.debug("Token budget set to: {}", tokens);
+    LOG_DEBUG("Token budget set to: {}", tokens);
 }
 
 size_t ContextEngine::getTokenUsage() const {
@@ -827,7 +824,7 @@ void ContextEngine::notifyChange(const std::string& conversation_id, const std::
         try {
             callback(conversation_id, change_type);
         } catch (const std::exception& e) {
-            impl_->logger.error("Context change callback failed: {}", e.what());
+            LOG_ERROR("Context change callback failed: {}", e.what());
         }
     }
 }
@@ -919,7 +916,7 @@ void ContextEngine::evictIfNeeded(const std::string& conversation_id) {
             ctx_it->second.erase(item_it);
             impl_->stats.evictions++;
             
-            impl_->logger.debug("Evicted context item: {} (score: {})", id, score);
+            LOG_DEBUG("Evicted context item: {} (score: {})", id, score);
         }
     }
 }

@@ -1,45 +1,22 @@
-// AIOS - MINI Coding Agent Operating System
-// Planner Implementation
-
 #include "planner/planner.h"
+#include "providers/ModelProvider.h"
+#include "providers/ModelRouter.h"
+#include "events/EventBus.h"
 #include "logging/Logger.h"
-#include <random>
+#include <nlohmann/json.hpp>
+#include <regex>
 #include <sstream>
-#include <iomanip>
-#include <algorithm>
 
 namespace aios {
 
-struct Planner::Impl {
-    std::unordered_map<std::string, Plan> plans;
-    
-    // Statistics
-    size_t total_created = 0;
-    size_t total_completed = 0;
-    size_t total_failed = 0;
-    double total_duration_ms = 0.0;
-    size_t total_steps_executed = 0;
-};
+Planner::Planner() 
+    : executor_(std::make_unique<TaskGraphExecutor>()) {}
 
-Planner::Planner() : impl_(std::make_unique<Impl>()) {}
-
-Planner::~Planner() {
-    stop();
-}
+Planner::~Planner() = default;
 
 bool Planner::initialize() {
     std::lock_guard<std::mutex> lock(mutex_);
-    
-    if (running_) {
-        LOG_WARN("Planner already initialized");
-        return true;
-    }
-    
-    LOG_INFO("Initializing Planner...");
-    running_ = true;
-    stopping_ = false;
-    
-    LOG_INFO("Planner initialized successfully");
+    LOG_INFO("Initializing Advanced Planner with CoT, ToT, and Reflection strategies...");
     return true;
 }
 
@@ -48,521 +25,234 @@ void Planner::shutdown() {
 }
 
 void Planner::stop() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    if (!running_) {
-        return;
+    if (executor_) {
+        executor_->cancel();
     }
-    
-    LOG_INFO("Stopping Planner...");
-    stopping_ = true;
-    running_ = false;
-    
-    LOG_INFO("Planner stopped");
 }
 
-std::string Planner::createPlan(const std::string& goal, 
-                                 const std::string& description) {
-    return createPlan(goal, {}, description);
+void Planner::setModelProvider(std::shared_ptr<ModelProvider> provider) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    model_provider_ = provider;
 }
 
-std::string Planner::createPlan(const std::string& goal,
-                                 std::vector<PlanStep> steps,
-                                 const std::string& description) {
+void Planner::setModelRouter(std::shared_ptr<ModelRouter> router) {
     std::lock_guard<std::mutex> lock(mutex_);
-    
-    if (stopping_) {
-        LOG_WARN("Planner is stopping, rejecting new plan");
-        return "";
-    }
-    
-    Plan plan;
-    plan.id = generateId();
-    plan.goal = goal;
-    plan.description = description;
-    plan.steps = std::move(steps);
-    plan.status = PlanStatus::Pending;
-    plan.created_at = std::chrono::system_clock::now();
-    plan.total_steps = static_cast<int>(plan.steps.size());
-    plan.completed_steps = 0;
-    
-    // Generate IDs for steps if not set
-    for (auto& step : plan.steps) {
-        if (step.id.empty()) {
-            step.id = generateId();
-        }
-        step.status = PlanStatus::Pending;
-        step.retry_count = 0;
-        if (step.max_retries == 0) {
-            step.max_retries = 3;
-        }
-    }
-    
-    impl_->plans[plan.id] = std::move(plan);
-    impl_->total_created++;
-    
-    LOG_INFO("Plan created: id={}, goal={}", plan.id, goal);
-    return plan.id;
+    model_router_ = router;
 }
 
-bool Planner::executePlan(const std::string& plan_id) {
+void Planner::setEventBus(std::shared_ptr<EventBus> event_bus) {
     std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it == impl_->plans.end()) {
-        LOG_ERROR("Plan not found: {}", plan_id);
-        return false;
+    event_bus_ = event_bus;
+    if (executor_) {
+        executor_->setEventBus(event_bus);
     }
-    
-    Plan& plan = it->second;
-    
-    if (plan.status == PlanStatus::Completed || 
-        plan.status == PlanStatus::Cancelled) {
-        LOG_WARN("Cannot execute plan in status: {}", static_cast<int>(plan.status));
-        return false;
-    }
-    
-    plan.status = PlanStatus::InProgress;
-    plan.started_at = std::chrono::system_clock::now();
-    
-    LOG_INFO("Executing plan: id={}, goal={}", plan_id, plan.goal);
-    
-    // Execute all pending steps in order
-    while (plan.status == PlanStatus::InProgress) {
-        if (!executeNextStep(plan_id)) {
-            break;
-        }
-    }
-    
-    return plan.status == PlanStatus::Completed;
 }
 
-bool Planner::executeNextStep(const std::string& plan_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it == impl_->plans.end()) {
-        return false;
+std::string Planner::callModel(const std::string& prompt, const std::string& system_prompt) {
+    std::vector<Message> msgs;
+    if (!system_prompt.empty()) {
+        msgs.push_back({"system", system_prompt});
     }
-    
-    Plan& plan = it->second;
-    
-    if (plan.status != PlanStatus::InProgress && plan.status != PlanStatus::Pending) {
-        return false;
+    msgs.push_back({"user", prompt});
+
+    if (model_router_) {
+        auto resp = model_router_->route(AgentType::Planner, msgs);
+        if (resp.success) return resp.content;
+    } else if (model_provider_) {
+        auto resp = model_provider_->chat(msgs);
+        if (resp.success) return resp.content;
     }
-    
-    // Find next executable step
-    PlanStep* next_step = nullptr;
-    for (auto& step : plan.steps) {
-        if (step.status == PlanStatus::Pending && canExecuteStep(plan, step)) {
-            next_step = &step;
-            break;
-        }
-    }
-    
-    if (!next_step) {
-        // Check if all steps are complete
-        bool all_complete = true;
-        bool any_failed = false;
-        
-        for (const auto& step : plan.steps) {
-            if (step.status != PlanStatus::Completed) {
-                all_complete = false;
-            }
-            if (step.status == PlanStatus::Failed) {
-                any_failed = true;
-            }
-        }
-        
-        if (all_complete) {
-            plan.status = PlanStatus::Completed;
-            plan.completed_at = std::chrono::system_clock::now();
-            impl_->total_completed++;
-            
-            auto duration = std::chrono::duration<double, std::milli>(
-                plan.completed_at - plan.started_at).count();
-            impl_->total_duration_ms += duration;
-            
-            LOG_INFO("Plan completed: id={}, duration={:.2f}ms", plan_id, duration);
-            
-            if (on_complete_) {
-                on_complete_(plan);
-            }
-        } else if (any_failed) {
-            plan.status = PlanStatus::Failed;
-            impl_->total_failed++;
-            
-            LOG_ERROR("Plan failed: id={}", plan_id);
-            
-            if (on_fail_) {
-                on_fail_(plan);
-            }
-        }
-        
-        return false;
-    }
-    
-    // Execute the step
-    next_step->status = PlanStatus::InProgress;
-    next_step->started_at = std::chrono::system_clock::now();
-    plan.current_step_id = next_step->id;
-    
-    LOG_DEBUG("Executing step: plan={}, step={}, action={}", 
-              plan_id, next_step->id, next_step->action);
-    
-    bool success = true;
-    if (step_executor_) {
-        success = step_executor_(plan_id, *next_step);
-    }
-    
-    impl_->total_steps_executed++;
-    
-    if (success) {
-        next_step->status = PlanStatus::Completed;
-        next_step->completed_at = std::chrono::system_clock::now();
-        plan.completed_steps++;
-        recalculatePlanProgress(plan);
-        
-        LOG_DEBUG("Step completed: plan={}, step={}", plan_id, next_step->id);
-    } else {
-        if (next_step->retry_count < next_step->max_retries) {
-            next_step->retry_count++;
-            next_step->status = PlanStatus::Pending;
-            
-            LOG_WARN("Step failed, will retry ({}/{}): plan={}, step={}", 
-                     next_step->retry_count, next_step->max_retries, 
-                     plan_id, next_step->id);
+
+    // Default rule-based fallback response
+    return R"(```json
+{
+  "nodes": [
+    {"id": "research", "title": "Research Codebase", "description": "Inspect files", "assigned_agent_type": 1, "dependencies": []},
+    {"id": "code", "title": "Write Implementation", "description": "Apply edits", "assigned_agent_type": 2, "dependencies": ["research"]},
+    {"id": "test", "title": "Run Test Suite", "description": "Execute tests", "assigned_agent_type": 3, "dependencies": ["code"]}
+  ]
+}
+```)";
+}
+
+TaskGraph Planner::parsePlanJsonToGraph(const std::string& text, const std::string& goal) {
+    TaskGraph graph(goal);
+    try {
+        std::regex json_regex(R"(```(?:json)?\s*(\{[\s\S]*?\})\s*```)", std::regex::icase);
+        std::smatch match;
+        std::string json_str;
+        if (std::regex_search(text, match, json_regex)) {
+            json_str = match[1].str();
         } else {
-            next_step->status = PlanStatus::Failed;
-            next_step->error_message = "Step execution failed after retries";
-            
-            LOG_ERROR("Step failed permanently: plan={}, step={}", plan_id, next_step->id);
+            json_str = text;
         }
-    }
-    
-    return true;
-}
 
-bool Planner::pausePlan(const std::string& plan_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it == impl_->plans.end()) {
-        return false;
-    }
-    
-    Plan& plan = it->second;
-    
-    if (plan.status != PlanStatus::InProgress) {
-        return false;
-    }
-    
-    plan.status = PlanStatus::Pending;
-    LOG_INFO("Plan paused: id={}", plan_id);
-    return true;
-}
-
-bool Planner::resumePlan(const std::string& plan_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it == impl_->plans.end()) {
-        return false;
-    }
-    
-    Plan& plan = it->second;
-    
-    if (plan.status != PlanStatus::Pending) {
-        return false;
-    }
-    
-    plan.status = PlanStatus::InProgress;
-    LOG_INFO("Plan resumed: id={}", plan_id);
-    return true;
-}
-
-bool Planner::cancelPlan(const std::string& plan_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it == impl_->plans.end()) {
-        return false;
-    }
-    
-    Plan& plan = it->second;
-    
-    if (plan.status == PlanStatus::Completed || 
-        plan.status == PlanStatus::Cancelled) {
-        return false;
-    }
-    
-    plan.status = PlanStatus::Cancelled;
-    plan.completed_at = std::chrono::system_clock::now();
-    
-    for (auto& step : plan.steps) {
-        if (step.status == PlanStatus::Pending || 
-            step.status == PlanStatus::InProgress) {
-            step.status = PlanStatus::Cancelled;
+        auto j = nlohmann::json::parse(json_str);
+        if (j.contains("nodes") && j["nodes"].is_array()) {
+            for (const auto& nj : j["nodes"]) {
+                TaskNode node;
+                node.id = nj.value("id", "task_" + std::to_string(graph.size() + 1));
+                node.title = nj.value("title", "Task");
+                node.description = nj.value("description", "");
+                node.assigned_agent_type = static_cast<AgentType>(nj.value("assigned_agent_type", 2));
+                if (nj.contains("dependencies") && nj["dependencies"].is_array()) {
+                    for (const auto& d : nj["dependencies"]) {
+                        node.dependencies.push_back(d.get<std::string>());
+                    }
+                }
+                graph.addNode(node);
+            }
         }
+    } catch (...) {
+        // Fallback default 3-node linear graph
+        TaskNode n1{"n1", "Research", "Research files", AgentType::Researcher, "", {}, {}, {}, "", "", TaskNodeState::Pending, "", 0, 2};
+        TaskNode n2{"n2", "Code", "Implement changes", AgentType::Coder, "", {"n1"}, {}, {}, "", "", TaskNodeState::Pending, "", 0, 2};
+        TaskNode n3{"n3", "Test", "Verify build and tests", AgentType::Tester, "", {"n2"}, {}, {}, "", "", TaskNodeState::Pending, "", 0, 2};
+        graph.addNode(n1);
+        graph.addNode(n2);
+        graph.addNode(n3);
     }
-    
-    LOG_INFO("Plan cancelled: id={}", plan_id);
-    return true;
+    return graph;
 }
 
-std::optional<Plan> Planner::getPlan(const std::string& plan_id) const {
+TaskGraph Planner::createPlan(const std::string& goal, 
+                             PlanStrategyType strategy,
+                             const std::unordered_map<std::string, std::string>& context) {
     std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it == impl_->plans.end()) {
-        return std::nullopt;
+    stats_.total_plans_created++;
+
+    switch (strategy) {
+        case PlanStrategyType::TreeOfThought:
+            stats_.tot_plans++;
+            return planWithToT(goal, 3, context);
+        case PlanStrategyType::Reflection:
+            stats_.reflection_plans++;
+            return planWithReflection(goal, context);
+        case PlanStrategyType::ChainOfThought:
+        default:
+            stats_.cot_plans++;
+            return planWithCoT(goal, context);
     }
-    
-    return it->second;
 }
 
-std::optional<PlanStatus> Planner::getPlanStatus(const std::string& plan_id) const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it == impl_->plans.end()) {
-        return std::nullopt;
-    }
-    
-    return it->second.status;
+TaskGraph Planner::planWithCoT(const std::string& goal,
+                              const std::unordered_map<std::string, std::string>& /*context*/) {
+    LOG_INFO("Planner: Generating Chain-of-Thought (CoT) Plan for: {}", goal);
+
+    std::string system_prompt = 
+        "You are an expert software planning agent.\n"
+        "Generate a Directed Acyclic Graph (DAG) of tasks in a ```json code block.\n"
+        "Each node has 'id', 'title', 'description', 'assigned_agent_type' (1=Researcher, 2=Coder, 3=Tester, 4=Reviewer, 8=Debugger), and 'dependencies'.";
+
+    std::string prompt = "Goal: " + goal + "\nDecompose this goal into a DAG task graph.";
+    std::string model_res = callModel(prompt, system_prompt);
+
+    return parsePlanJsonToGraph(model_res, goal);
 }
 
-std::optional<PlanStep> Planner::getCurrentStep(const std::string& plan_id) const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it == impl_->plans.end()) {
-        return std::nullopt;
+double Planner::evaluateBranchViability(const std::string& goal, const TaskGraph& graph, std::string& notes) {
+    if (graph.empty()) return 0.0;
+    if (graph.hasCycle()) return 0.0;
+
+    double score = 70.0;
+    // Reward balanced dependencies and inclusion of research & testing
+    bool has_researcher = false;
+    bool has_tester = false;
+    for (const auto& node : graph.getAllNodes()) {
+        if (node.assigned_agent_type == AgentType::Researcher) has_researcher = true;
+        if (node.assigned_agent_type == AgentType::Tester) has_tester = true;
     }
-    
-    const Plan& plan = it->second;
-    
-    for (const auto& step : plan.steps) {
-        if (step.id == plan.current_step_id) {
-            return step;
-        }
-    }
-    
-    return std::nullopt;
+    if (has_researcher) score += 15.0;
+    if (has_tester) score += 15.0;
+
+    notes = "Evaluated graph with " + std::to_string(graph.size()) + " nodes. Score: " + std::to_string(score);
+    return score;
 }
 
-bool Planner::updateStepResult(const std::string& plan_id,
-                                const std::string& step_id,
-                                const std::string& result) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it == impl_->plans.end()) {
-        return false;
+TaskGraph Planner::planWithToT(const std::string& goal,
+                              size_t num_branches,
+                              const std::unordered_map<std::string, std::string>& context) {
+    LOG_INFO("Planner: Generating Tree-of-Thought (ToT) with {} candidate branches for: {}", num_branches, goal);
+
+    std::vector<TreeBranchCandidate> candidates;
+
+    // Branch 1: Incremental / Minimalist
+    {
+        std::string prompt = "Goal: " + goal + "\nStrategy: Minimalist, surgical incremental change.";
+        TaskGraph g = parsePlanJsonToGraph(callModel(prompt), goal);
+        std::string notes;
+        double score = evaluateBranchViability(goal, g, notes);
+        candidates.push_back({"branch_minimal", "Incremental surgical modifications", g, score, notes});
     }
-    
-    Plan& plan = it->second;
-    
-    for (auto& step : plan.steps) {
-        if (step.id == step_id) {
-            step.result = result;
-            return true;
-        }
+
+    // Branch 2: Modular / Comprehensive
+    {
+        std::string prompt = "Goal: " + goal + "\nStrategy: Comprehensive modular architecture with full testing.";
+        TaskGraph g = parsePlanJsonToGraph(callModel(prompt), goal);
+        std::string notes;
+        double score = evaluateBranchViability(goal, g, notes);
+        candidates.push_back({"branch_modular", "Full modular architecture", g, score, notes});
     }
-    
-    return false;
+
+    // Branch 3: Conservative / Defensive
+    if (num_branches >= 3) {
+        std::string prompt = "Goal: " + goal + "\nStrategy: Defensive implementation with thorough validation & rollback checkpoints.";
+        TaskGraph g = parsePlanJsonToGraph(callModel(prompt), goal);
+        std::string notes;
+        double score = evaluateBranchViability(goal, g, notes);
+        candidates.push_back({"branch_defensive", "Defensive with safety checkpoints", g, score, notes});
+    }
+
+    // Select branch with highest score
+    auto best_it = std::max_element(candidates.begin(), candidates.end(), 
+        [](const TreeBranchCandidate& a, const TreeBranchCandidate& b) {
+            return a.score < b.score;
+        });
+
+    LOG_INFO("Planner: Selected ToT Branch [{}] with score {}", best_it->branch_id, best_it->score);
+    return best_it->graph;
 }
 
-bool Planner::completeStep(const std::string& plan_id,
-                            const std::string& step_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it == impl_->plans.end()) {
-        return false;
+TaskGraph Planner::planWithReflection(const std::string& goal,
+                                     const std::unordered_map<std::string, std::string>& context) {
+    LOG_INFO("Planner: Generating Reflection-Refined Plan for: {}", goal);
+
+    // Step 1: Draft initial plan
+    TaskGraph draft = planWithCoT(goal, context);
+
+    // Step 2: Self-Critique & Refine
+    std::string critique_prompt = 
+        "Critique and refine this execution graph for goal: " + goal + "\n"
+        "Draft Graph JSON:\n" + draft.toJsonString() + "\n\n"
+        "Ensure all edge cases, missing file prerequisites, and verification steps are covered.";
+
+    std::string refined_res = callModel(critique_prompt, "You are a master code architect reviewing execution graphs.");
+    TaskGraph refined_graph = parsePlanJsonToGraph(refined_res, goal);
+
+    if (refined_graph.empty()) {
+        return draft;
     }
-    
-    Plan& plan = it->second;
-    
-    for (auto& step : plan.steps) {
-        if (step.id == step_id) {
-            step.status = PlanStatus::Completed;
-            step.completed_at = std::chrono::system_clock::now();
-            plan.completed_steps++;
-            recalculatePlanProgress(plan);
-            return true;
-        }
-    }
-    
-    return false;
+    return refined_graph;
 }
 
-bool Planner::failStep(const std::string& plan_id,
-                        const std::string& step_id,
-                        const std::string& error) {
+TaskGraphExecutionSummary Planner::executePlan(TaskGraph& graph, TaskNodeHandler handler) {
     std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it == impl_->plans.end()) {
-        return false;
+    stats_.executed_graphs++;
+
+    if (handler) {
+        executor_->setNodeHandler(handler);
     }
-    
-    Plan& plan = it->second;
-    
-    for (auto& step : plan.steps) {
-        if (step.id == step_id) {
-            step.status = PlanStatus::Failed;
-            step.error_message = error;
-            return true;
-        }
+
+    auto summary = executor_->execute(graph);
+    if (summary.success) {
+        stats_.successful_graphs++;
     }
-    
-    return false;
+    return summary;
 }
 
 PlannerStats Planner::getStats() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    
-    PlannerStats stats{};
-    stats.total_plans = impl_->total_created;
-    stats.completed_plans = impl_->total_completed;
-    stats.failed_plans = impl_->total_failed;
-    stats.total_steps_executed = impl_->total_steps_executed;
-    
-    for (const auto& [id, plan] : impl_->plans) {
-        if (plan.status == PlanStatus::InProgress || 
-            plan.status == PlanStatus::Pending) {
-            stats.active_plans++;
-        }
-    }
-    
-    if (stats.completed_plans > 0) {
-        stats.average_plan_duration_ms = impl_->total_duration_ms / stats.completed_plans;
-    }
-    
-    return stats;
-}
-
-void Planner::setStepExecutor(StepExecutor executor) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    step_executor_ = std::move(executor);
-}
-
-void Planner::setOnPlanComplete(PlanCallback callback) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    on_complete_ = std::move(callback);
-}
-
-void Planner::setOnPlanFail(PlanCallback callback) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    on_fail_ = std::move(callback);
-}
-
-std::vector<PlanStep> Planner::getPendingSteps(const std::string& plan_id) const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    std::vector<PlanStep> pending;
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it == impl_->plans.end()) {
-        return pending;
-    }
-    
-    const Plan& plan = it->second;
-    
-    for (const auto& step : plan.steps) {
-        if (step.status == PlanStatus::Pending && canExecuteStep(plan, step)) {
-            pending.push_back(step);
-        }
-    }
-    
-    return pending;
-}
-
-bool Planner::addContext(const std::string& plan_id,
-                          const std::string& key,
-                          const std::string& value) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it == impl_->plans.end()) {
-        return false;
-    }
-    
-    it->second.context[key] = value;
-    return true;
-}
-
-std::optional<std::string> Planner::getContext(const std::string& plan_id,
-                                                 const std::string& key) const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it == impl_->plans.end()) {
-        return std::nullopt;
-    }
-    
-    auto ctx_it = it->second.context.find(key);
-    if (ctx_it == it->second.context.end()) {
-        return std::nullopt;
-    }
-    
-    return ctx_it->second;
-}
-
-std::string Planner::generateId() const {
-    static std::random_device rd;
-    static std::mt19937_64 gen(rd());
-    static std::uniform_int_distribution<uint64_t> dist;
-    static std::atomic<uint64_t> counter{0};
-    
-    auto id = dist(gen) ^ (counter++ << 32);
-    std::stringstream ss;
-    ss << std::hex << std::setfill('0') << std::setw(16) << id;
-    return ss.str();
-}
-
-void Planner::updatePlanStatus(const std::string& plan_id, PlanStatus status) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    auto it = impl_->plans.find(plan_id);
-    if (it != impl_->plans.end()) {
-        it->second.status = status;
-    }
-}
-
-bool Planner::canExecuteStep(const Plan& plan, const PlanStep& step) const {
-    // Check if all dependencies are completed
-    for (const auto& dep_id : step.dependencies) {
-        bool found = false;
-        bool completed = false;
-        
-        for (const auto& s : plan.steps) {
-            if (s.id == dep_id) {
-                found = true;
-                if (s.status == PlanStatus::Completed) {
-                    completed = true;
-                }
-                break;
-            }
-        }
-        
-        if (!found || !completed) {
-            return false;
-        }
-    }
-    
-    return true;
-}
-
-void Planner::recalculatePlanProgress(Plan& plan) {
-    int completed = 0;
-    for (const auto& step : plan.steps) {
-        if (step.status == PlanStatus::Completed) {
-            completed++;
-        }
-    }
-    plan.completed_steps = completed;
+    return stats_;
 }
 
 } // namespace aios

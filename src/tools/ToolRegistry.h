@@ -287,26 +287,7 @@ private:
     ToolResult analyzeComplexity(const std::unordered_map<std::string, std::string>& params);
 };
 
-/**
- * @brief Testing Tools
- */
-class TestingTools : public Tool {
-public:
-    explicit TestingTools(std::shared_ptr<TerminalExecutor> executor,
-                          std::shared_ptr<FileSystem> fs);
-    
-    ToolDefinition getDefinition() const override;
-    ToolResult execute(const std::unordered_map<std::string, std::string>& params) override;
-    ToolStats getStats() const override { return stats_; }
-    
-private:
-    std::shared_ptr<TerminalExecutor> executor_;
-    std::shared_ptr<FileSystem> fs_;
-    
-    ToolResult runTests(const std::unordered_map<std::string, std::string>& params);
-    ToolResult runTestFile(const std::unordered_map<std::string, std::string>& params);
-    ToolResult getTestCoverage(const std::unordered_map<std::string, std::string>& params);
-};
+
 
 /**
  * @brief Build Tools

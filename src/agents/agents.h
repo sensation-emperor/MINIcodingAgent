@@ -7,11 +7,14 @@
 #include <mutex>
 #include <atomic>
 #include <optional>
+#include <chrono>
 
 namespace aios {
 
 // Forward declarations
 class ModelProvider;
+class ToolRegistry;
+class EventBus;
 class Task;
 
 enum class AgentType {
@@ -50,14 +53,14 @@ struct AgentCapabilities {
 struct AgentConfig {
     std::string id;
     std::string name;
-    AgentType type;
+    AgentType type = AgentType::Generic;
     std::string model_name;
     std::string system_prompt;
     double temperature = 0.7;
     int max_tokens = 4096;
-    int max_iterations = 50;
+    int max_iterations = 20;
     AgentCapabilities capabilities;
-    std::chrono::milliseconds timeout{30000};
+    std::chrono::milliseconds timeout{60000};
     size_t max_retries = 3;
 };
 
@@ -71,70 +74,79 @@ struct AgentResult {
 };
 
 struct AgentStats {
-    size_t total_tasks;
-    size_t completed_tasks;
-    size_t failed_tasks;
-    size_t cancelled_tasks;
-    double average_iterations;
-    double average_execution_time_ms;
+    size_t total_tasks = 0;
+    size_t completed_tasks = 0;
+    size_t failed_tasks = 0;
+    size_t cancelled_tasks = 0;
+    double average_iterations = 0.0;
+    double average_execution_time_ms = 0.0;
 };
 
 /**
- * @brief Autonomous agent that can perceive, plan, act, and reflect
+ * @brief Base autonomous agent that perceives, plans, acts, and reflects.
  */
-class Agent {
+class Agent : public std::enable_shared_from_this<Agent> {
 public:
     explicit Agent(AgentConfig config);
-    ~Agent();
+    virtual ~Agent();
     
-    // Get agent configuration
+    // Configuration & State
     const AgentConfig& getConfig() const { return config_; }
-    
-    // Get current state
+    AgentConfig& getConfigRef() { return config_; }
     AgentState getState() const { return state_; }
-    
-    // Get agent ID
     const std::string& getId() const { return config_.id; }
+    AgentType getType() const { return config_.type; }
     
-    // Execute a task
-    AgentResult execute(const std::string& task, 
-                        const std::unordered_map<std::string, std::string>& context = {});
+    // Providers & Dependencies
+    void setModelProvider(std::shared_ptr<ModelProvider> provider);
+    std::shared_ptr<ModelProvider> getModelProvider() const;
     
-    // Cancel current execution
+    void setToolRegistry(std::shared_ptr<ToolRegistry> registry);
+    std::shared_ptr<ToolRegistry> getToolRegistry() const;
+    
+    void setEventBus(std::shared_ptr<EventBus> event_bus);
+    std::shared_ptr<EventBus> getEventBus() const;
+
+    // Observability Callbacks
+    using StateChangeCallback = std::function<void(AgentState old_state, AgentState new_state)>;
+    using ToolCallCallback = std::function<void(const std::string& tool_name, const std::unordered_map<std::string, std::string>& params)>;
+    using ThoughtCallback = std::function<void(const std::string& thought)>;
+
+    void onStateChange(StateChangeCallback callback);
+    void onToolCall(ToolCallCallback callback);
+    void onThought(ThoughtCallback callback);
+
+    // Execution
+    virtual AgentResult execute(const std::string& task, 
+                                const std::unordered_map<std::string, std::string>& context = {});
+    
     void cancel();
-    
-    // Pause execution
     void pause();
-    
-    // Resume execution
     void resume();
-    
-    // Check if busy
     bool isBusy() const;
-    
-    // Get current task
     std::optional<std::string> getCurrentTask() const;
+
+protected:
+    // Lifecycle hooks for specialized agents
+    virtual std::string buildSystemPrompt() const;
+    virtual std::string think(const std::string& observation,
+                              const std::unordered_map<std::string, std::string>& context);
+    virtual std::string act(const std::string& action);
+    virtual bool reflect(const std::string& result, const std::string& task);
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> impl_;
+    void setState(AgentState new_state);
+    void publishEvent(const std::string& event_name, const std::string& json_data);
+
     AgentConfig config_;
     std::atomic<AgentState> state_{AgentState::Idle};
     mutable std::mutex mutex_;
-    
-    // Internal execution loop
+
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+
+private:
     AgentResult executeLoop(const std::string& task,
                             const std::unordered_map<std::string, std::string>& context);
-    
-    // Think step - generate next action
-    std::string think(const std::string& observation,
-                      const std::unordered_map<std::string, std::string>& context);
-    
-    // Act step - execute tool calls
-    std::string act(const std::string& action);
-    
-    // Reflect step - critique result
-    bool reflect(const std::string& result, const std::string& task);
 };
 
 /**
@@ -144,51 +156,45 @@ class AgentManager {
 public:
     static AgentManager& instance();
     
-    // Initialize agent manager
     bool initialize();
-    
-    // Shutdown all agents
     void shutdown();
-    
-    // Stop all agents gracefully
     void stop();
     
-    // Create a new agent
+    // Agent lifecycle
     std::string createAgent(const AgentConfig& config);
-    
-    // Get an agent by ID
     std::shared_ptr<Agent> getAgent(const std::string& agent_id);
-    
-    // Remove an agent
     bool removeAgent(const std::string& agent_id);
-    
-    // List all agents
     std::vector<std::string> listAgents() const;
     
-    // Execute task on an agent
+    // Execution
     AgentResult executeTask(const std::string& agent_id,
                             const std::string& task,
                             const std::unordered_map<std::string, std::string>& context = {});
     
-    // Broadcast task to multiple agents
     std::unordered_map<std::string, AgentResult> broadcastTask(
         const std::vector<std::string>& agent_ids,
         const std::string& task,
         const std::unordered_map<std::string, std::string>& context = {});
     
-    // Get statistics
     AgentStats getStats() const;
     
-    // Set default model provider
+    // Dependencies injection
     void setModelProvider(std::shared_ptr<ModelProvider> provider);
+    std::shared_ptr<ModelProvider> getModelProvider() const;
+
+    void setToolRegistry(std::shared_ptr<ToolRegistry> registry);
+    std::shared_ptr<ToolRegistry> getToolRegistry() const;
+
+    void setEventBus(std::shared_ptr<EventBus> event_bus);
+    std::shared_ptr<EventBus> getEventBus() const;
     
-    // Register agent type factory
+    // Factory registration
     using AgentFactory = std::function<std::shared_ptr<Agent>(const AgentConfig&)>;
     void registerAgentType(AgentType type, AgentFactory factory);
     
 private:
-    AgentManager() = default;
-    ~AgentManager() = default;
+    AgentManager();
+    ~AgentManager();
     
     AgentManager(const AgentManager&) = delete;
     AgentManager& operator=(const AgentManager&) = delete;
