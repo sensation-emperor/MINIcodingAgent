@@ -1,4 +1,4 @@
-#include "src/core/ModelLibraryManager.h"
+#include "core/ModelLibraryManager.h"
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QFile>
