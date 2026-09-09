@@ -1,15 +1,82 @@
 #pragma once
 
+#ifdef BUILD_GUI
 #include <QObject>
 #include <QMap>
 #include <QString>
 #include <QDateTime>
 #include <QUuid>
+#include <QVariant>
+#include <QList>
+#endif
+
 #include <memory>
 #include <vector>
 #include <functional>
+#include <string>
+#include <cstdint>
+
+// Forward declarations for Qt types if GUI is not built
+#ifndef BUILD_GUI
+class QObject {
+public:
+    virtual ~QObject() = default;
+    void setParent(void*) {}
+    void* parent() const { return nullptr; }
+};
+#define Q_OBJECT
+#endif
 
 namespace brahma {
+
+#ifndef BUILD_GUI
+// Minimal implementations for non-GUI build
+struct QUuid {
+    static QUuid createUuid() { return QUuid{}; }
+    bool operator==(const QUuid& other) const { return data1 == other.data1; }
+    uint32_t data1 = 0;
+};
+
+class QString {
+public:
+    QString() = default;
+    QString(const std::string& s) : m_str(s) {}
+    QString(const char* s) : m_str(s ? s : "") {}
+    const std::string& toStdString() const { return m_str; }
+    const char* c_str() const { return m_str.c_str(); }
+private:
+    std::string m_str;
+};
+
+class QDateTime {
+public:
+    static QDateTime currentDateTime() { return QDateTime{}; }
+    qint64 toMSecsSinceEpoch() const { return 0; }
+private:
+    qint64 m_msecs = 0;
+};
+
+template<typename K, typename V>
+class QMap {
+public:
+    void insert(const K&, const V&) {}
+    V value(const K&) const { return V{}; }
+    bool contains(const K&) const { return false; }
+};
+
+class QVariant {
+public:
+    QVariant() = default;
+    template<typename T> QVariant(const T&) {}
+};
+
+template<typename T>
+class QList {
+public:
+    void append(const T&) {}
+    int size() const { return 0; }
+};
+#endif
 
 /**
  * @brief Represents a single message in a conversation
