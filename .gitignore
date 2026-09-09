@@ -1,12 +1,11 @@
 ```
-# Compiled and binary files
+# Compiled and build artifacts
 *.o
 *.obj
 *.out
 
 # Dependencies
 build/
-dist/
 
 # Logs and temp files
 *.log
