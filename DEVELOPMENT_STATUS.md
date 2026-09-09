@@ -31,8 +31,8 @@ Build a **proper GUI harness** that allows users to:
 | M2: Sandboxed Git Workspace | ✅ Complete | 100% | Worker M2 |
 | M3: Automated Testing Engine | ✅ Complete | 100% | Worker M3 |
 | M4: Subsystem Integration | ✅ Complete | 100% | Worker M4 |
-| **M5: GUI Harness Development** | 🟡 In Progress | 40% | Current Team |
-| M6: Documentation Unification | 🟡 In Progress | 30% | Current Team |
+| **M5: GUI Harness Development** | 🟡 In Progress | 55% | Current Team |
+| M6: Documentation Unification | ✅ Complete | 80% | Current Team |
 | M7: Local Model Integration | ⚪ Planned | 0% | Pending |
 | M8: Cloud Provider Integration | ⚪ Planned | 0% | Pending |
 | M9: Multi-Agent Orchestration UI | ⚪ Planned | 0% | Pending |
@@ -135,7 +135,7 @@ Build a **proper GUI harness** that allows users to:
 
 | Component | File | Status | Description |
 |-----------|------|--------|-------------|
-| Main Window | `MainWindow.h/cpp` | ✅ Complete | Main application viewport with view switching |
+| Main Window | `MainWindow.h/cpp` | ✅ Complete | Main application viewport with menu bar and view switching |
 | Chat View | `ChatView.h/cpp` | ✅ Complete | Conversational interface with token streaming |
 | Task Graph View | `TaskGraphView.h/cpp` | ✅ Complete | Interactive DAG progress visualizer |
 | Diff Viewer | `DiffViewer.h/cpp` | ✅ Complete | Syntax-highlighted code diff inspector |
@@ -143,17 +143,19 @@ Build a **proper GUI harness** that allows users to:
 | Command Pill | `CommandPillWidget.h/cpp` | ✅ Complete | Mode toggle and model selector |
 | Nav Bar | `FloatingIslandNavBar.h/cpp` | ✅ Complete | Floating capsule navigation |
 | Theme System | `Theme.h/cpp` | ✅ Complete | Coral Rose to Sunset Orange gradient design |
+| **Settings Dialog** | `ModelSettingsPanel.h/cpp` | ✅ **NEW** | Full settings UI with 4 tabs (Models, General, Shortcuts, About) |
+| **Model Manager** | `ModelSettingsPanel.h/cpp` | ✅ **NEW** | Provider configuration with health monitoring & metrics |
 
 ### GUI Next Steps
-- [ ] Add Model Management Panel (configure local/cloud providers)
-- [ ] Add Settings Dialog (permissions, preferences, shortcuts)
+- [ ] Wire ModelSettingsPanel to actual ModelRouter persistence (save/load JSON config)
+- [ ] Implement actual connection testing (HTTP request to endpoint)
+- [ ] Add auto-discovery of models from LM Studio/Ollama endpoints
 - [ ] Add Conversation History Browser
 - [ ] Add File Explorer with AST navigation
-- [ ] Add Real-time Metrics Dashboard
-- [ ] Add Plugin/Extension Manager UI
+- [ ] Add Real-time Metrics Dashboard with charts
 - [ ] Implement drag-and-drop file upload
 - [ ] Add split-view mode for side-by-side comparisons
-- [ ] Implement dark/light theme toggle
+- [ ] Implement dynamic dark/light theme toggle
 - [ ] Add accessibility features (screen reader support, keyboard navigation)
 
 ---

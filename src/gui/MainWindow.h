@@ -8,6 +8,7 @@
 #include "gui/DiffViewer.h"
 #include "gui/TaskGraphView.h"
 #include "gui/TerminalWidget.h"
+#include "gui/ModelSettingsPanel.h"
 
 #ifdef BUILD_GUI
 #include <QMainWindow>
@@ -36,6 +37,9 @@ public:
     void setModelRouter(std::shared_ptr<ModelRouter> router);
     void setEventBus(std::shared_ptr<EventBus> event_bus);
 
+public slots:
+    void openSettings();
+
 private slots:
     void handleTabChange(NavigationTab tab);
     void handlePromptSubmit(const QString& prompt, ExecutionMode mode, const QString& provider);
@@ -44,7 +48,9 @@ private slots:
 private:
     void setupUi();
     void wireEventBus();
+    void createMenuBar();
 
+    QMenuBar* menu_bar_ = nullptr;
     FloatingIslandNavBar* nav_bar_ = nullptr;
     QStackedWidget* stacked_widget_ = nullptr;
     CommandPillWidget* command_pill_ = nullptr;
@@ -58,6 +64,8 @@ private:
     std::shared_ptr<Planner> planner_;
     std::shared_ptr<ModelRouter> model_router_;
     std::shared_ptr<EventBus> event_bus_;
+    
+    SettingsDialog* settings_dialog_ = nullptr;
 };
 #else
 class MainWindow {};
