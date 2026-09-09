@@ -8,7 +8,7 @@
 #include <QNetworkAccessManager>
 #include <QTimer>
 #include <memory>
-#include "src/data/ModelProvider.h"
+#include "data/ModelProvider.h"
 
 namespace Brahma {
 

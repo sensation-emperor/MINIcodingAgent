@@ -1,4 +1,4 @@
-#include "src/data/ModelProvider.h"
+#include "data/ModelProvider.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QDebug>

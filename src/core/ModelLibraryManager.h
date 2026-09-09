@@ -9,7 +9,7 @@
 #include <QFileSystemWatcher>
 #include <QDir>
 #include <QStandardPaths>
-#include "src/data/ModelProvider.h"
+#include "data/ModelProvider.h"
 
 namespace Brahma {
 
