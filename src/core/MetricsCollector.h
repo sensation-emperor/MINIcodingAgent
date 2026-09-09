@@ -2,12 +2,18 @@
 
 #ifdef BUILD_GUI
 #include <QObject>
+#include <QWidget>
 #include <QMap>
 #include <QString>
 #include <QDateTime>
 #include <QMutex>
 #include <QQueue>
 #include <QVector>
+#include <QColor>
+#include <QPaintEvent>
+#include <QResizeEvent>
+#include <QPainter>
+#include <QTimer>
 #endif
 
 #include <atomic>

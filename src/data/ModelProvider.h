@@ -6,10 +6,14 @@
 #include <QList>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
+#include <QJsonArray>
 #include <QTimer>
 #include <chrono>
+
+#ifdef BUILD_GUI
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#endif
 
 namespace Brahma {
 
