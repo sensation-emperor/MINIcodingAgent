@@ -7,6 +7,10 @@
 #include "logging/Logger.h"
 #include <thread>
 #include <QMetaObject>
+#include <QMenuBar>
+#include <QMenu>
+#include <QAction>
+#include <QMessageBox>
 
 #ifdef BUILD_GUI
 namespace aios {
@@ -14,12 +18,101 @@ namespace gui {
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setupUi();
+    createMenuBar();
 }
 
 MainWindow::~MainWindow() = default;
 
+void MainWindow::createMenuBar() {
+    menu_bar_ = menuBar();
+    
+    // File Menu
+    auto* file_menu = menu_bar_->addMenu("&File");
+    
+    auto* settings_action = file_menu->addAction("&Settings...");
+    settings_action->setShortcut(QKeySequence::Preferences);
+    connect(settings_action, &QAction::triggered, this, &MainWindow::openSettings);
+    
+    file_menu->addSeparator();
+    
+    auto* exit_action = file_menu->addAction("E&xit");
+    exit_action->setShortcut(QKeySequence::Quit);
+    connect(exit_action, &QAction::triggered, this, &QWidget::close);
+    
+    // View Menu
+    auto* view_menu = menu_bar_->addMenu("&View");
+    
+    auto* chat_action = view_menu->addAction("&Chat");
+    chat_action->setShortcut(tr("Ctrl+1"));
+    connect(chat_action, &QAction::triggered, [this]() {
+        if (nav_bar_) nav_bar_->setActiveTab(NavigationTab::Chat);
+    });
+    
+    auto* taskgraph_action = view_menu->addAction("&Task Graph");
+    taskgraph_action->setShortcut(tr("Ctrl+2"));
+    connect(taskgraph_action, &QAction::triggered, [this]() {
+        if (nav_bar_) nav_bar_->setActiveTab(NavigationTab::TaskGraph);
+    });
+    
+    auto* diff_action = view_menu->addAction("&Diffs");
+    diff_action->setShortcut(tr("Ctrl+3"));
+    connect(diff_action, &QAction::triggered, [this]() {
+        if (nav_bar_) nav_bar_->setActiveTab(NavigationTab::DiffViewer);
+    });
+    
+    auto* terminal_action = view_menu->addAction("&Terminal");
+    terminal_action->setShortcut(tr("Ctrl+4"));
+    connect(terminal_action, &QAction::triggered, [this]() {
+        if (nav_bar_) nav_bar_->setActiveTab(NavigationTab::Terminal);
+    });
+    
+    // Tools Menu
+    auto* tools_menu = menu_bar_->addMenu("&Tools");
+    
+    auto* clear_cache_action = tools_menu->addAction("&Clear Cache");
+    connect(clear_cache_action, &QAction::triggered, [this]() {
+        chat_view_->addAgentMessage("AIOS", "Cache cleared.");
+    });
+    
+    // Help Menu
+    auto* help_menu = menu_bar_->addMenu("&Help");
+    
+    auto* about_action = help_menu->addAction("&About");
+    connect(about_action, &QAction::triggered, [this]() {
+        QMessageBox::about(this, "About UnnatSystems Brahma Coder",
+            "<h2>UnnatSystems Brahma Coder</h2>"
+            "<p>Version 1.0.0</p>"
+            "<p>Autonomous AI-powered coding agent operating system.</p>"
+            "<p>Built with C++23 and Qt 6</p>"
+            "<p>© 2026 UnnatSystems</p>"
+        );
+    });
+}
+
+void MainWindow::openSettings() {
+    if (!settings_dialog_) {
+        settings_dialog_ = new SettingsDialog(this);
+        settings_dialog_->setModelRouter(model_router_);
+        
+        // Connect settings change signals
+        connect(settings_dialog_, &SettingsDialog::themeChanged, [this](const std::string& theme) {
+            // Apply theme change
+            setStyleSheet(QString::fromStdString(Theme::getGlobalStyleSheet()));
+        });
+        
+        connect(settings_dialog_, &SettingsDialog::permissionsChanged, [this](bool require_approval) {
+            // Update permission settings
+            Logger::info("Permissions updated: require_approval={}", require_approval);
+        });
+    }
+    
+    settings_dialog_->show();
+    settings_dialog_->raise();
+    settings_dialog_->activateWindow();
+}
+
 void MainWindow::setupUi() {
-    setWindowTitle("MINIcodingAgent - AIOS");
+    setWindowTitle("UnnatSystems Brahma Coder");
     resize(1200, 800);
     setStyleSheet(QString::fromStdString(Theme::getGlobalStyleSheet()));
 
@@ -59,7 +152,7 @@ void MainWindow::setupUi() {
     setCentralWidget(central_widget);
 
     // Initial greeting
-    chat_view_->addAgentMessage("AIOS", "Welcome to MINIcodingAgent! Ready to assist with planning, coding, testing, and debugging. Enter your task below.");
+    chat_view_->addAgentMessage("AIOS", "Welcome to UnnatSystems Brahma Coder! Ready to assist with planning, coding, testing, and debugging. Enter your task below.");
 }
 
 void MainWindow::setOrchestrator(std::shared_ptr<MultiAgentOrchestrator> orchestrator) {
