@@ -127,3 +127,131 @@ This document outlines the features planned and implemented for the MINIcodingAg
   - 100-node wide concurrent DAG execution under `TaskGraphExecutor`.
   - 1,000+ document semantic search queries under `VectorStore`.
   - Zero-allocation SSE stream chunk extraction under `HttpClient`.
+
+---
+
+## 🚧 PLANNED FEATURES: LM Studio Bionic-like Enhancements
+
+### 10. Enhanced Local Model Experience (LM Studio First-Class Integration)
+- **Model Discovery & Auto-Configuration**:
+  - Automatic detection of running LM Studio instances via local network scan.
+  - One-click model download/install from Hugging Face through LM Studio integration.
+  - Model capability detection (context window, token limits, supported features).
+- **Adaptive Prompt Optimization**:
+  - Dynamic prompt templating based on detected model family (Llama, Mistral, Phi, Gemma).
+  - Token-aware context compression with sliding window for small-context models.
+  - Smart system prompt injection for coding-specific tasks.
+
+---
+
+### 11. Interactive Chat Interface Enhancements (Bionic-inspired UX)
+- **Rich Conversation Management**:
+  - Multi-thread conversation support with branch/fork capabilities.
+  - Conversation state persistence with quick resume functionality.
+  - Visual conversation tree explorer showing agent decision paths.
+- **Inline Code Actions**:
+  - Click-to-apply code suggestions directly from chat output.
+  - Inline diff preview before accepting changes.
+  - One-click revert for applied modifications.
+- **Agent Thought Transparency**:
+  - Collapsible reasoning traces showing step-by-step agent thinking.
+  - Confidence indicators for suggested actions.
+  - Alternative solution branching with comparison view.
+
+---
+
+### 12. Advanced Autocomplete & Inline Completion
+- **Context-Aware Code Completion**:
+  - Real-time streaming inline completions powered by local LLM.
+  - Multi-line completion support with intelligent cursor placement.
+  - Ghost text rendering with tab-to-accept interaction.
+- **Semantic Code Understanding**:
+  - Symbol-aware completions using AST context.
+  - Import/include auto-completion based on usage patterns.
+  - Function signature help with parameter hints from repository knowledge.
+
+---
+
+### 13. Enhanced Model Router Intelligence
+- **Workload-Aware Model Selection**:
+  - Automatic routing: simple queries → small models, complex reasoning → large models.
+  - Cost-performance optimization with user-configurable preferences.
+  - Fallback chain with graceful degradation and user notification.
+- **Model Health Monitoring Dashboard**:
+  - Real-time latency, throughput, and error rate visualization.
+  - Historical performance tracking per model/provider.
+  - Predictive health alerts before failures occur.
+
+---
+
+### 14. Developer Workflow Automation
+- **Smart Task Templates**:
+  - Pre-built workflows for common tasks (refactor, debug, add feature, write tests).
+  - Customizable workflow builder with drag-and-drop task graph editor.
+  - Workflow sharing and community template marketplace.
+- **Git Integration Enhancements**:
+  - Intelligent commit message generation from code changes.
+  - PR/MR description auto-generation with change summary.
+  - Conflict resolution assistance with AI-powered merge suggestions.
+
+---
+
+### 15. Knowledge & Memory Augmentation
+- **Long-Term Project Memory**:
+  - Persistent project-specific knowledge graphs across sessions.
+  - User preference learning and automatic prompt customization.
+  - Architectural decision record (ADR) extraction and storage.
+- **Cross-Project Intelligence**:
+  - Pattern recognition across multiple repositories.
+  - Reusable component identification and suggestion.
+  - Best practice recommendations based on successful patterns.
+
+---
+
+### 16. Observability & Debugging Tools
+- **Agent Execution Tracing**:
+  - Detailed execution timeline with tool call inspection.
+  - Token usage breakdown per agent/task/conversation.
+  - Bottleneck identification with optimization suggestions.
+- **Error Diagnosis & Recovery**:
+  - Automatic root cause analysis for failed agent runs.
+  - Suggested recovery actions with one-click retry.
+  - Failure pattern detection and prevention recommendations.
+
+---
+
+### 17. Security & Compliance Features
+- **Enhanced Permission System**:
+  - Granular permission controls per tool/action type.
+  - Audit logging with tamper-proof event records.
+  - Compliance reporting for enterprise deployments.
+- **Code Security Scanning**:
+  - Integrated vulnerability detection in generated code.
+  - License compliance checking for suggested dependencies.
+  - Secret detection and redaction in outputs.
+
+---
+
+## 📋 IMPLEMENTATION PRIORITIES
+
+| Priority | Feature | Effort | Impact | Dependencies |
+|----------|---------|--------|--------|--------------|
+| P0 | Enhanced Local Model Experience | Medium | High | Existing ModelProvider infrastructure |
+| P0 | Interactive Chat Interface | High | High | GUI framework, EventBus |
+| P1 | Advanced Autocomplete | High | High | LSP integration, AST parser |
+| P1 | Model Router Intelligence | Medium | Medium | Metrics system, HttpClient |
+| P2 | Developer Workflow Automation | Medium | Medium | TaskGraph, Workspace Manager |
+| P2 | Knowledge & Memory Augmentation | High | Medium | VectorStore, KnowledgeGraph |
+| P3 | Observability & Debugging Tools | Medium | Medium | Logging, Metrics |
+| P3 | Security & Compliance Features | Low | Low | ToolRegistry, Permission system |
+
+---
+
+## 🎯 SUCCESS METRICS
+
+- **Model Integration**: Support 5+ local model providers with seamless switching
+- **User Experience**: <100ms perceived latency for inline completions
+- **Code Quality**: >90% acceptance rate for AI-suggested changes
+- **Reliability**: 99.9% uptime for local model connections
+- **Performance**: Handle 1000+ file repositories with <5s context building
+- **Memory Efficiency**: <500MB RAM footprint for typical development sessions
