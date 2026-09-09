@@ -5,6 +5,8 @@
 #include <QString>
 #include <QDateTime>
 #include <QMutex>
+#include <QQueue>
+#include <QVector>
 #include <atomic>
 #include <memory>
 #include <vector>
@@ -58,6 +60,71 @@ struct ModelMetrics {
 };
 
 /**
+ * @brief Metrics for agent activity tracking
+ */
+struct AgentMetrics {
+    QString agentType;
+    qint64 totalActions = 0;
+    double totalDurationMs = 0.0;
+    double averageDurationMs = 0.0;
+    QMap<QString, qint64> actionCounts;
+    QDateTime lastActive;
+    
+    void recordAction(const QString& action, double durationMs) {
+        totalActions++;
+        totalDurationMs += durationMs;
+        averageDurationMs = totalDurationMs / totalActions;
+        if (!action.isEmpty()) {
+            actionCounts[action]++;
+        }
+        lastActive = QDateTime::currentDateTime();
+    }
+};
+
+/**
+ * @brief Metrics for tool usage tracking
+ */
+struct ToolMetrics {
+    QString toolName;
+    qint64 usageCount = 0;
+    qint64 successCount = 0;
+    double totalDurationMs = 0.0;
+    double averageDurationMs = 0.0;
+    double successRate = 100.0;
+    QDateTime lastUsed;
+    
+    void recordUsage(bool success, double durationMs) {
+        usageCount++;
+        if (success) {
+            successCount++;
+        }
+        totalDurationMs += durationMs;
+        averageDurationMs = totalDurationMs / usageCount;
+        successRate = usageCount > 0 ? (successCount * 100.0 / usageCount) : 100.0;
+        lastUsed = QDateTime::currentDateTime();
+    }
+};
+
+/**
+ * @brief File operation record for tracking filesystem activity
+ */
+struct FileOperation {
+    QString operation;
+    QString path;
+    qint64 sizeBytes = 0;
+    QDateTime timestamp;
+};
+
+/**
+ * @brief User action record for tracking user interactions
+ */
+struct UserActionRecord {
+    QString action;
+    QVariant metadata;
+    QDateTime timestamp;
+};
+
+/**
  * @brief Aggregated analytics data for a time period
  */
 struct AnalyticsSnapshot {
@@ -104,6 +171,11 @@ public:
     
     // Querying metrics
     ModelMetrics getModelMetrics(const QString& modelId) const;
+    QMap<QString, ModelMetrics> getAllModelMetrics() const;
+    AgentMetrics getAgentMetrics(const QString& agentType) const;
+    QMap<QString, AgentMetrics> getAllAgentMetrics() const;
+    ToolMetrics getToolMetrics(const QString& toolName) const;
+    QVector<AnalyticsSnapshot> getSnapshots(int hours = 24) const;
     QList<QString> getAllModelIds() const;
     AnalyticsSnapshot getSnapshot() const;
     AnalyticsSnapshot getSnapshotForPeriod(QDateTime start, QDateTime end) const;
@@ -112,6 +184,10 @@ public:
     QVector<AnalyticsSnapshot> getHistory(int hours = 24) const;
     QVector<AnalyticsSnapshot> getHourlyHistory(int days = 7) const;
     QVector<AnalyticsSnapshot> getDailyHistory(int days = 30) const;
+    
+    // File operations and user actions
+    QQueue<FileOperation> getRecentFileOperations(int limit = 100) const;
+    QVector<UserActionRecord> getUserActions(int limit = 500) const;
     
     // Performance analysis
     QString getBestPerformingModel() const;
@@ -134,19 +210,26 @@ public:
     
 signals:
     void metricsUpdated();
+    void agentMetricsUpdated(const QString& agentType);
+    void toolMetricsUpdated(const QString& toolName);
     void alertTriggered(const QString& type, const QString& message, double value);
     void thresholdExceeded(const QString& metric, double threshold, double actual);
     
 private:
     explicit MetricsCollector(QObject* parent = nullptr);
-    ~MetricsManager() override;
+    ~MetricsCollector() override;
     
     static MetricsCollector* s_instance;
     mutable QMutex m_mutex;
     
     QMap<QString, ModelMetrics> m_modelMetrics;
+    QMap<QString, AgentMetrics> m_agentMetrics;
+    QMap<QString, ToolMetrics> m_toolMetrics;
     QMap<QString, double> m_modelCosts; // cost per token
     QMap<QString, qint64> m_accumulatedCosts; // total cost per model
+    
+    QQueue<FileOperation> m_recentFileOperations;
+    QVector<UserActionRecord> m_userActions;
     
     QVector<AnalyticsSnapshot> m_hourlySnapshots;
     QVector<AnalyticsSnapshot> m_dailySnapshots;

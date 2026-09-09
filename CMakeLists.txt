@@ -37,7 +37,7 @@ set(CORE_SOURCES
     src/kernel/Kernel.cpp
     src/scheduler/scheduler.cpp
     src/planner/planner.cpp
-    src/taskgraph/TaskGraph.cpp
+    src/taskgraph/taskgraph.cpp
     src/parser/ASTParser.cpp
     src/repository/RepositoryIndex.cpp
     src/database/DatabaseEngine.cpp
