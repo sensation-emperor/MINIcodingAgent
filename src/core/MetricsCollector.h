@@ -1,5 +1,6 @@
 #pragma once
 
+#ifdef BUILD_GUI
 #include <QObject>
 #include <QMap>
 #include <QString>
@@ -7,6 +8,8 @@
 #include <QMutex>
 #include <QQueue>
 #include <QVector>
+#endif
+
 #include <atomic>
 #include <memory>
 #include <vector>

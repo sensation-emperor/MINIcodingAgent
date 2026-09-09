@@ -100,7 +100,7 @@ std::string ReplClient::dimText(std::string_view text) {
 
 void ReplClient::printDivider(int width) {
     if (supports_ansi()) std::cout << "\033[2m";
-    std::cout << std::string(width, '─');
+    for (int i = 0; i < width; ++i) std::cout << '─';
     if (supports_ansi()) std::cout << "\033[0m";
     std::cout << "\n";
 }
@@ -206,12 +206,12 @@ void ReplClient::handleResearch(const std::string& query) {
     std::cout << colorize("◆ Researching: ", ANSI_CYAN) << query << "\n\n";
     if (memory_) {
         std::cout << dimText("  → Querying MemoryManager...\n");
-        auto results = memory_->search(query, 5);
+        auto results = memory_->search(query, "", 5);
         if (results.empty()) {
             std::cout << dimText("  No memory results found.\n\n");
         } else {
             for (const auto& r : results) {
-                std::cout << "  • " << r << "\n";
+                std::cout << "  • [" << r.category << "] " << r.key << ": " << r.value << "\n";
             }
             std::cout << "\n";
         }

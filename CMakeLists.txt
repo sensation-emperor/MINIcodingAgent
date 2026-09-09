@@ -5,6 +5,19 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Enable native CPU optimizations for SIMD instructions (AVX2, etc.)
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
+if(COMPILER_SUPPORTS_MARCH_NATIVE)
+    add_compile_options(-march=native)
+else()
+    # Fallback to SSE4.2 if march=native is not available
+    check_cxx_compiler_flag("-msse4.2" COMPILER_SUPPORTS_SSE42)
+    if(COMPILER_SUPPORTS_SSE42)
+        add_compile_options(-msse4.2)
+    endif()
+endif()
+
 # Build options
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_GUI "Build Qt GUI" OFF)
@@ -58,15 +71,38 @@ set(CORE_SOURCES
     src/gui/Theme.cpp
     src/config/ConfigManager.cpp
     src/cli/ReplClient.cpp
+    src/cli/Repl.cpp
+    src/cli/CliSession.cpp
+    src/cli/CommandRegistry.cpp
+    src/cli/LineReader.cpp
+    src/cli/NonInteractiveRunner.cpp
+    src/cli/SlashCommand.cpp
+    src/cli/TerminalRenderer.cpp
     src/workspace/WorkspaceManager.cpp
+    src/workspace/WorkspaceTools.cpp
+    src/workspace/BranchSandbox.cpp
+    src/workspace/GitWorktree.cpp
+    src/workspace/PathContainment.cpp
+    src/workspace/SnapshotManager.cpp
     src/testing/TestGenerator.cpp
-    src/core/ConversationManager.cpp
-    src/core/MetricsCollector.cpp
-    src/core/ModelLibraryManager.cpp
-    src/core/ModelRouter.cpp
-    src/core/TaskPlanner.cpp
-    src/core/WorkspaceProjectManager.cpp
+    src/testing/TestRunner.cpp
+    src/testing/TestingManager.cpp
+    src/testing/TestingTools.cpp
+    src/testing/CoverageAnalyzer.cpp
+    src/testing/DiagnosticsEngine.cpp
 )
+
+# GUI-specific core modules (only included when BUILD_GUI is ON)
+if(BUILD_GUI)
+    list(APPEND CORE_SOURCES
+        src/core/ConversationManager.cpp
+        src/core/MetricsCollector.cpp
+        src/core/ModelLibraryManager.cpp
+        src/core/ModelRouter.cpp
+        src/core/TaskPlanner.cpp
+        src/core/WorkspaceProjectManager.cpp
+    )
+endif()
 
 if(BUILD_GUI)
     list(APPEND CORE_SOURCES
