@@ -60,6 +60,12 @@ set(CORE_SOURCES
     src/cli/ReplClient.cpp
     src/workspace/WorkspaceManager.cpp
     src/testing/TestGenerator.cpp
+    src/core/ConversationManager.cpp
+    src/core/MetricsCollector.cpp
+    src/core/ModelLibraryManager.cpp
+    src/core/ModelRouter.cpp
+    src/core/TaskPlanner.cpp
+    src/core/WorkspaceProjectManager.cpp
 )
 
 if(BUILD_GUI)
